@@ -1,0 +1,131 @@
+{
+  "source": "Tripo P2-20260801 via public v3 API",
+  "processing": "Blender 5.2; original P2 geometry retained, PBR preserved, 1536px textures / hero and boss 2048px",
+  "models": [
+    {
+      "name": "packet",
+      "file": "/models/packet.glb",
+      "model": "P2-20260801",
+      "task_id": "94f37d9a-7298-42b4-9b59-0205a0012f14",
+      "rig_task_id": null,
+      "bytes": 1570136,
+      "faces": 23981,
+      "animations": []
+    },
+    {
+      "name": "spinner",
+      "file": "/models/spinner.glb",
+      "model": "P2-20260801",
+      "task_id": "c4243b52-d8b2-45ca-b786-445c159473e7",
+      "rig_task_id": null,
+      "bytes": 1887368,
+      "faces": 24358,
+      "animations": []
+    },
+    {
+      "name": "guard",
+      "file": "/models/guard.glb",
+      "model": "P2-20260801",
+      "task_id": "d2414816-3334-4339-bbb7-de229864a433",
+      "rig_task_id": null,
+      "bytes": 1859512,
+      "faces": 25051,
+      "animations": []
+    },
+    {
+      "name": "charger",
+      "file": "/models/charger.glb",
+      "model": "P2-20260801",
+      "task_id": "06cc8704-08dd-4d66-98d8-065e6b46458e",
+      "rig_task_id": null,
+      "bytes": 1736116,
+      "faces": 22819,
+      "animations": []
+    },
+    {
+      "name": "router",
+      "file": "/models/router.glb",
+      "model": "P2-20260801",
+      "task_id": "cec52a49-798c-441a-bd50-c01a46348eba",
+      "rig_task_id": null,
+      "bytes": 2469688,
+      "faces": 24919,
+      "animations": []
+    },
+    {
+      "name": "beijing",
+      "file": "/models/beijing.glb",
+      "model": "P2-20260801",
+      "task_id": "62bbbc52-66c9-459c-a040-63a7c432dd6c",
+      "rig_task_id": null,
+      "bytes": 1811100,
+      "faces": 23421,
+      "animations": []
+    },
+    {
+      "name": "shanghai",
+      "file": "/models/shanghai.glb",
+      "model": "P2-20260801",
+      "task_id": "1182f47f-e628-4d67-ae75-25f4533fd844",
+      "rig_task_id": null,
+      "bytes": 1982244,
+      "faces": 24833,
+      "animations": []
+    },
+    {
+      "name": "hangzhou",
+      "file": "/models/hangzhou.glb",
+      "model": "P2-20260801",
+      "task_id": "0e308cc2-d46b-4be5-8c9e-b999301d6822",
+      "rig_task_id": null,
+      "bytes": 2072624,
+      "faces": 26615,
+      "animations": []
+    },
+    {
+      "name": "california",
+      "file": "/models/california.glb",
+      "model": "P2-20260801",
+      "task_id": "3b97b432-6867-41cf-a10b-3996a092f087",
+      "rig_task_id": null,
+      "bytes": 1844940,
+      "faces": 22955,
+      "animations": []
+    },
+    {
+      "name": "shenzhen",
+      "file": "/models/shenzhen.glb",
+      "model": "P2-20260801",
+      "task_id": "e535257f-1d36-491a-b85e-5865baa80045",
+      "rig_task_id": null,
+      "bytes": 2315028,
+      "faces": 22444,
+      "animations": []
+    },
+    {
+      "name": "hero",
+      "file": "/models/hero.glb",
+      "model": "P2-20260801",
+      "task_id": "1ba47944-2715-465c-8671-fa7f356a98e6",
+      "rig_task_id": "3d850d02-35e5-4a53-a8ab-16418ba321b2",
+      "bytes": 3107456,
+      "faces": 26706,
+      "animations": [
+        "idle",
+        "run",
+        "jab",
+        "cross",
+        "uppercut",
+        "kick",
+        "special",
+        "dash",
+        "jump",
+        "hurt",
+        "fall",
+        "sweep",
+        "lunge",
+        "land"
+      ]
+    }
+  ]
+}

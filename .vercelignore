@@ -1,0 +1,14 @@
+.git/
+.env
+.env.*
+.llmdoc-tmp/
+node_modules/
+dist/
+art/
+llmdoc/
+scripts/tripo.py
+scripts/prepare_assets.py
+**/__pycache__/
+scripts/asset_prompts.json
+
+scripts/hero_motion.py

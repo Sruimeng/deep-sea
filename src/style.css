@@ -1,0 +1,73 @@
+@import './components/game/game.css';
+
+:root {
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  color: #f2f2f2;
+  background: #0c0d10;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  font-weight: 400;
+  color-scheme: dark;
+  --brand: #f9cf00;
+  --lime: var(--brand);
+  --paper: #f2f2f2;
+  --muted: #999999;
+  --line: #333333;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  min-width: 360px;
+}
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+button {
+  font: inherit;
+  cursor: pointer;
+  color: inherit;
+}
+button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 6px;
+}
+button {
+  border: 0;
+}
+a {
+  color: inherit;
+}
+button svg {
+  flex-shrink: 0;
+}
+button {
+  touch-action: manipulation;
+}
+::selection {
+  background: var(--lime);
+  color: #192014;
+}
+kbd {
+  font:
+    11px 'SFMono-Regular',
+    Consolas,
+    monospace;
+  border: 1px solid #68715b;
+  min-width: 22px;
+  padding: 3px 5px;
+  border-radius: 3px;
+  display: inline-block;
+  text-align: center;
+}
+button:focus:not(:focus-visible) {
+  outline: none;
+}
