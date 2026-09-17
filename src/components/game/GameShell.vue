@@ -148,7 +148,9 @@ function focusTrap(event: KeyboardEvent) {
   const dialog = document.querySelector<HTMLElement>('[role="dialog"]')
   if (!dialog || event.key !== 'Tab') return
   const focusable = [
-    ...dialog.querySelectorAll<HTMLElement>('button:not([disabled]), [href], [tabindex="0"]'),
+    ...dialog.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), summary, [href], [tabindex="0"]',
+    ),
   ]
   const first = focusable[0],
     last = focusable.at(-1)

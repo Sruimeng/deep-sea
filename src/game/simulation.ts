@@ -1,3 +1,4 @@
+import { completedBefore, draftChoices, levelOf, TOTAL_BLOCKS } from './roguelike'
 import { attackMove } from './attacks'
 import { STREET, streetBounds, streetCenter } from './street'
 import { blockAt } from './blocks'
@@ -18,6 +19,7 @@ import type {
   Projectile,
   Prop,
   SaveData,
+  RunSave,
   Snapshot,
   Sound,
   UpgradeId,
@@ -33,6 +35,9 @@ export class Game {
   stage = 0
   wave = 0
   advancing = false
+  seed = 1
+  private checkpoint?: RunSave
+  private directHits = 0
   private dashBuffer = 0
   private pursuitTarget: number | null = null
   score = 0
@@ -91,8 +96,7 @@ export class Game {
     this.setupProps()
   }
   private actor(kind: Actor['kind'], x: number, z: number): Actor {
-    const hp =
-      kind === 'hero' ? 100 + (this.upgrades.includes('coffee') ? 35 : 0) : ENEMY_STATS[kind].hp
+    const hp = kind === 'hero' ? 100 + this.level('coffee') * 35 : ENEMY_STATS[kind].hp
     return {
       id: ++this.nextId,
       kind,
@@ -120,15 +124,46 @@ export class Game {
       collisionHits: [],
     }
   }
+  level(id: UpgradeId) {
+    return levelOf(this.upgrades, id)
+  }
   start(save?: SaveData) {
     this.stage = save?.stage ?? 0
+    this.wave = save?.version === 2 ? save.wave : 0
     this.score = save?.score ?? 0
     this.upgrades = [...(save?.upgrades ?? [])]
-    this.kills = this.bestCombo = this.elapsed = this.rage = 0
-    this.loadStage()
+    const run = save?.version === 2 ? save : undefined
+    this.seed = run?.seed ?? Math.floor(Math.random() * 0xffffffff)
+    this.kills = run?.kills ?? 0
+    this.bestCombo = run?.bestCombo ?? 0
+    this.elapsed = run?.elapsed ?? 0
+    this.rage = run?.rage ?? 0
+    this.loadStage(run)
   }
-  private loadStage() {
-    this.hero = this.actor('hero', -6, 0)
+  private save(phase: RunSave['phase'], wave = this.wave) {
+    const checkpoint: RunSave = {
+      version: 2,
+      stage: this.stage,
+      wave,
+      phase,
+      seed: this.seed,
+      score: this.score,
+      upgrades: [...this.upgrades],
+      hp: this.hero.hp,
+      rage: this.rage,
+      kills: this.kills,
+      bestCombo: this.bestCombo,
+      elapsed: this.elapsed,
+      bountyScore: this.bountyScore,
+      clearBonus: this.clearBonus,
+    }
+    this.checkpoint = checkpoint
+    this.onCheckpoint?.({ ...checkpoint, upgrades: [...checkpoint.upgrades] })
+  }
+  private loadStage(run?: RunSave) {
+    this.hero = this.actor('hero', streetCenter(this.wave) - 6, 0)
+    this.hero.hp = run?.hp ?? this.hero.maxHp
+    this.directHits = 0
     this.enemies = []
     this.reserves = []
     this.waveTotal = this.waveKills = this.streak = this.streakTime = 0
@@ -138,8 +173,8 @@ export class Game {
     this.effects = []
     this.drops = []
     this.rewards = []
-    this.bountyScore = this.clearBonus = 0
-    this.wave = 0
+    this.bountyScore = run?.bountyScore ?? 0
+    this.clearBonus = run?.clearBonus ?? 0
     this.advancing = false
     this.dashBuffer = 0
     this.pursuitTarget = null
@@ -156,13 +191,9 @@ export class Game {
     this.bossTurn = 0
     this.toastTime = 0
     this.setupProps()
-    this.mode = 'intro'
-    this.onCheckpoint?.({
-      version: 1,
-      stage: this.stage,
-      score: this.score,
-      upgrades: [...this.upgrades],
-    })
+    this.mode = run?.phase === 'draft' ? 'upgrade' : 'intro'
+    this.choices = draftChoices(this.upgrades, this.seed, this.stage, this.wave)
+    this.save(run?.phase ?? 'start')
   }
   begin() {
     if (this.mode === 'intro') {
@@ -190,13 +221,32 @@ export class Game {
     this.effects = []
   }
   retry() {
-    this.rage = 0
-    this.loadStage()
+    this.start(this.checkpoint)
   }
   choose(id: UpgradeId) {
     if (this.mode !== 'upgrade' || !this.choices.some((choice) => choice.id === id)) return
+    if (this.level(id) >= UPGRADES.find((item) => item.id === id)!.maxLevel) return
     this.upgrades.push(id)
+    this.hero.maxHp = 100 + this.level('coffee') * 35
+    this.hero.hp =
+      id === 'coffee'
+        ? this.hero.maxHp
+        : Math.min(this.hero.maxHp, this.hero.hp + this.hero.maxHp * 0.2)
+    this.choices = []
+    if (this.wave < STAGES[this.stage]!.waves.length - 1) {
+      this.advancing = true
+      this.mode = 'playing'
+      this.save('start', this.wave + 1)
+      this.announce('成长已保存 · 向右前进 →')
+      return
+    }
+    if (this.stage === STAGES.length - 1) {
+      this.mode = 'victory'
+      this.onFinish?.(this.score)
+      return
+    }
     this.stage++
+    this.wave = 0
     this.loadStage()
   }
   private setupProps() {
@@ -213,6 +263,8 @@ export class Game {
 
   private spawnWave() {
     this.advancing = false
+    this.reviveUsed = false
+    this.directHits = 0
     this.waveDelay = 0
     const kinds = STAGES[this.stage]!.waves[this.wave]!
     this.reserves = [...kinds]
@@ -230,7 +282,7 @@ export class Game {
     this.announce(
       kinds.includes('boss')
         ? '延迟之王上线。注意地面预警！'
-        : `街段 ${this.wave + 1} / 3 · ${hint}`,
+        : `街段 ${this.wave + 1} / ${STAGES[this.stage]!.waves.length} · ${hint}`,
     )
   }
   get crowdLimit() {
@@ -334,6 +386,7 @@ export class Game {
     if (this.advancing) {
       if (this.hero.x >= streetCenter(this.wave + 1) + STREET.entry) {
         this.wave++
+        this.save('start')
         this.spawnWave()
       }
       return
@@ -355,27 +408,23 @@ export class Game {
       this.sounds.push('reward')
     }
     this.waveDelay += dt
-    if (this.waveDelay < (this.wave < 2 ? 0.45 : 1.7)) return
+    if (this.waveDelay < 0.65) return
     this.waveDelay = 0
     this.drops.forEach((drop) => this.collectDrop(drop))
     this.drops = []
-    if (this.wave < STAGES[this.stage]!.waves.length - 1) {
-      this.advancing = true
-      this.projectiles = []
-      this.zones = []
-      this.announce('街段打通！向右前进 →')
-      return
-    }
-    this.sounds.push('win')
-    this.clearBonus = 500 + Math.round(this.hero.hp * 2)
-    this.score += this.clearBonus
-    if (this.stage === STAGES.length - 1) {
-      this.mode = 'victory'
-      this.onFinish?.(this.score)
-      return
+    this.projectiles = []
+    this.zones = []
+    this.pendingStrike = false
+    this.hero.attack = this.hero.cooldown = this.dashTime = 0
+    this.clearBonus = 0
+    if (this.wave === STAGES[this.stage]!.waves.length - 1) {
+      this.clearBonus = 500 + Math.round(this.hero.hp * 2)
+      this.score += this.clearBonus
+      this.sounds.push('win')
     }
     this.mode = 'upgrade'
-    this.choices = UPGRADES.filter((upgrade) => !this.upgrades.includes(upgrade.id)).slice(0, 3)
+    this.choices = draftChoices(this.upgrades, this.seed, this.stage, this.wave)
+    this.save('draft')
   }
   get bounds() {
     return streetBounds(this.wave, this.advancing)
@@ -440,7 +489,9 @@ export class Game {
       this.dashTime = 0.22
       this.pursuitTarget = null
       this.effect('dash', h, '#f9cf00')
-      this.dashCooldown = this.upgrades.includes('dash') ? 0.7 : 1.2
+      this.dashCooldown = this.level('dash')
+        ? Math.max(0.38, 0.78 - this.level('dash') * 0.08)
+        : 1.2
       this.dashHits.clear()
       this.sounds.push('dash')
     }
@@ -464,11 +515,11 @@ export class Game {
       h.x = this.clampX(h.x + h.facing * 18 * dt)
     if (this.dashTime > 0) {
       this.dashTime -= dt
-      if (this.upgrades.includes('dash'))
+      if (this.level('dash'))
         this.enemies.forEach((enemy) => {
           if (enemy.hp <= 0 || distance(h, enemy) > 1.8 || this.dashHits.has(enemy.id)) return
           this.dashHits.add(enemy.id)
-          this.hitEnemy(enemy, 25, 7, true)
+          this.hitEnemy(enemy, 15 + 10 * this.level('dash'), 7, true)
         })
     }
     if ((input.attack || this.attackBuffer > 0) && h.cooldown === 0) {
@@ -558,7 +609,11 @@ export class Game {
         continue
       this.hitEnemy(
         enemy,
-        move.damage * (this.upgrades.includes('keyboard') ? 1.35 : 1) + (this.weapon ? 12 : 0),
+        move.damage *
+          (1 + this.level('keyboard') * 0.35) *
+          (1 + (h.strike === 4 || h.strike === 8 ? this.level('aerial') * 0.3 : 0)) *
+          (1 + Math.min(4, Math.floor(this.combo / 5)) * this.level('combo') * 0.05) +
+          (this.weapon ? 12 : 0),
         move.force,
         h.strike === 4 || h.strike === 8,
       )
@@ -570,6 +625,12 @@ export class Game {
         if (h.strike === 8) this.effect('text', enemy, '#f9cf00', '追击！')
       }
       hits++
+    }
+    if (hits && this.level('quake') && (h.strike === 3 || h.strike === 6)) {
+      this.effect('special', h, '#ffb35c').radius = 3.6
+      for (const enemy of this.enemies)
+        if (enemy.hp > 0 && distance(enemy, h) <= 3.6)
+          this.hitEnemy(enemy, this.level('quake') * 10, 7, true, false)
     }
     for (const prop of this.props) {
       if (prop.broken || distance(h, prop) > reach || (prop.x - h.x) * h.facing < -0.6) continue
@@ -644,7 +705,7 @@ export class Game {
       this.comboDamage += dealt
       this.bestCombo = Math.max(this.combo, this.bestCombo)
       this.comboTime = 2.7
-      if (charge) this.rage = Math.min(100, this.rage + (this.upgrades.includes('cable') ? 11 : 8))
+      if (charge) this.rage = Math.min(100, this.rage + (8 + this.level('cable') * 3))
     }
     const height = enemy.y + (enemy.kind === 'boss' ? 2.1 : enemy.kind === 'guard' ? 1.6 : 1.15)
     const lane =
@@ -677,9 +738,20 @@ export class Game {
         this.slowTime = enemy.kind === 'boss' ? 0.4 : 0.18
       this.kill(enemy)
     }
+    if (!blocked && charge && this.level('chain') && ++this.directHits % 4 === 0) {
+      const targets = this.enemies
+        .filter((other) => other.id !== enemy.id && other.hp > 0 && distance(other, enemy) < 5)
+        .slice(0, 3)
+      for (const other of targets) {
+        this.effect('impact', other, '#83cfff', undefined, 2)
+        this.hitEnemy(other, 12 * this.level('chain'), 2, true, false)
+      }
+      if (targets.length) this.effect('text', enemy, '#83cfff', '静电广播')
+    }
   }
 
   private kill(enemy: Actor) {
+    this.hero.hp = Math.min(this.hero.maxHp, this.hero.hp + this.level('leech') * 2)
     this.kills++
     this.waveKills++
     this.streak = this.streakTime > 0 ? this.streak + 1 : 1
@@ -769,7 +841,7 @@ export class Game {
       return
     }
     this.weapon = prop.kind
-    this.weaponUses = 7
+    this.weaponUses = 7 + this.level('throw') * 2
     prop.broken = true
     this.sounds.push('pickup')
     this.announce(`${WEAPON_NAMES[prop.kind]}已装备 · J 挥打 / E 投掷`)
@@ -790,10 +862,10 @@ export class Game {
     this.sounds.push('charge')
   }
   private resolveSpecial() {
-    const upgraded = this.upgrades.includes('cable')
+    const upgraded = this.level('cable')
     for (const enemy of this.enemies)
       if (distance(enemy, this.hero) < (upgraded ? 12 : 7))
-        this.hitEnemy(enemy, upgraded ? 110 : 80, 16, true, false)
+        this.hitEnemy(enemy, 80 + upgraded * 30, 16, true, false)
     this.projectiles = this.projectiles.filter((p) => p.friendly)
     this.effect('special', this.hero).radius = upgraded ? 12 : 7
     this.sounds.push('special')
@@ -1024,7 +1096,7 @@ export class Game {
   private damageHero(damage: number, from: Point) {
     if (this.mode !== 'playing' || this.hero.hurt > 0 || this.dashTime > 0) return
     const h = this.hero
-    h.hp = Math.max(0, h.hp - damage)
+    h.hp = Math.max(0, h.hp - damage * (1 - this.level('armor') * 0.08))
     h.hurt = 0.85
     h.vx = (Math.sign(h.x - from.x) || 1) * 4
     this.combo = this.comboDamage = 0
@@ -1033,9 +1105,9 @@ export class Game {
     this.hitStop = 0.055
     this.sounds.push('hurt')
     if (h.hp > 0) return
-    if (this.upgrades.includes('cache') && !this.reviveUsed) {
+    if (this.level('cache') && !this.reviveUsed) {
       this.reviveUsed = true
-      h.hp = h.maxHp / 2
+      h.hp = h.maxHp * (0.4 + this.level('cache') * 0.1)
       h.hurt = 2
       this.enemies.forEach((e) => (e.vx = (Math.sign(e.x - h.x) || 1) * 12))
       this.effect('special', h)
@@ -1057,7 +1129,7 @@ export class Game {
         for (const enemy of this.enemies) {
           if (enemy.hp <= 0 || p.hit.includes(enemy.id) || distance(p, enemy) > 1.3) continue
           p.hit.push(enemy.id)
-          this.hitEnemy(enemy, 55, 13, true)
+          this.hitEnemy(enemy, 55 + this.level('throw') * 25, 13, true)
         }
         for (const prop of this.props)
           if (!prop.broken && prop.kind === 'relay' && distance(p, prop) < 1.4) {
@@ -1123,10 +1195,7 @@ export class Game {
   private collectDrop(drop: Drop) {
     drop.life = 0
     if (drop.kind === 'coffee') {
-      this.hero.hp = Math.min(
-        this.hero.maxHp,
-        this.hero.hp + (this.upgrades.includes('coffee') ? 35 : 22),
-      )
+      this.hero.hp = Math.min(this.hero.maxHp, this.hero.hp + (22 + this.level('coffee') * 13))
       this.effect('heal', this.hero)
       this.effect('text', this.hero, '#f9cf00', '续命咖啡')
     } else this.score += 50
@@ -1170,6 +1239,15 @@ export class Game {
       elapsed: this.elapsed,
       dashReady: this.dashCooldown === 0,
       choices: this.choices,
+      build: UPGRADES.filter((item) => this.level(item.id) > 0).map((item) => ({
+        ...item,
+        level: this.level(item.id),
+      })),
+      completed:
+        completedBefore(this.stage, this.wave) +
+        (this.mode === 'upgrade' || this.mode === 'victory' || this.advancing ? 1 : 0),
+      total: TOTAL_BLOCKS,
+      waveCount: STAGES[this.stage]!.waves.length,
     }
   }
 }

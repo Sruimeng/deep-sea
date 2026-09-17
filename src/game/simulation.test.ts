@@ -222,26 +222,23 @@ describe('boss and progression', () => {
       finish = vi.fn()
     game.onCheckpoint = checkpoint
     game.onFinish = finish
-    for (let stage = 0; stage < STAGES.length; stage++) {
-      for (let wave = 0; wave < 3; wave++) {
-        for (
-          let frame = 0;
-          frame < 1200 && game.wave === wave && game.mode === 'playing';
-          frame++
-        ) {
-          game.enemies.forEach((enemy) => (enemy.hp = 0))
-          game.tick(1 / 60, controls([], game.advancing ? 1 : 0))
-        }
-      }
-      if (stage < STAGES.length - 1) {
-        expect(game.mode).toBe('upgrade')
+    let drafts = 0
+    for (let frame = 0; frame < 30000 && game.mode !== 'victory'; frame++) {
+      if (game.mode === 'intro') game.begin()
+      if (game.mode === 'upgrade') {
+        drafts++
+        expect(game.choices).toHaveLength(3)
         game.choose(game.choices[0]!.id)
-        expect(game.mode).toBe('intro')
-        expect(game.hero.hp).toBe(game.hero.maxHp)
-        expect(checkpoint).toHaveBeenLastCalledWith(expect.objectContaining({ stage: stage + 1 }))
-        game.begin()
+        continue
       }
+      game.enemies.forEach((enemy) => (enemy.hp = 0))
+      game.tick(1 / 60, controls([], game.advancing ? 1 : 0))
     }
+    expect(drafts).toBe(30)
+    expect(game.upgrades).toHaveLength(30)
+    expect(checkpoint).toHaveBeenCalledWith(
+      expect.objectContaining({ version: 2, stage: 4, wave: 5, phase: 'draft' }),
+    )
     expect(game.mode).toBe('victory')
     expect(finish).toHaveBeenCalledTimes(1)
     advance(game, 5)
@@ -261,10 +258,11 @@ describe('boss and progression', () => {
 it('a movement-and-attack bot can finish the campaign without modifying health or enemies', () => {
   const game = new Game()
   game.start()
+  game.seed = 741
   const routes: string[] = []
   for (
     let frame = 0;
-    frame < 60 * 600 && game.mode !== 'victory' && game.mode !== 'gameover';
+    frame < 60 * 1200 && game.mode !== 'victory' && game.mode !== 'gameover';
     frame++
   ) {
     if (game.mode === 'intro') {
@@ -273,7 +271,9 @@ it('a movement-and-attack bot can finish the campaign without modifying health o
     }
     if (game.mode === 'upgrade') {
       const preferred = ['keyboard', 'coffee', 'cable', 'cache', 'dash'] as const
-      const choice = preferred.find((id) => game.choices.some((option) => option.id === id))!
+      const choice =
+        preferred.find((id) => game.choices.some((option) => option.id === id)) ??
+        game.choices[0]!.id
       game.choose(choice)
       continue
     }
@@ -410,7 +410,7 @@ describe('guaranteed combat rewards', () => {
   })
   it('settles distant loot before opening the stage reward screen', () => {
     const game = playing()
-    game.wave = 2
+    game.wave = STAGES[game.stage]!.waves.length - 1
     game.enemies = []
     game.drops = [{ id: 999, kind: 'data', x: 11, z: 3, life: 18 }]
     advance(game, 1.8)
@@ -421,7 +421,7 @@ describe('guaranteed combat rewards', () => {
   it('includes the boss bounty and remaining loot in the final score exactly once', () => {
     const game = playing(4)
     const boss = isolate(game, 'boss')
-    game.wave = 2
+    game.wave = STAGES[game.stage]!.waves.length - 1
     boss.hp = 1
     game.shieldUsed = true
     game.hero.hp = 40
@@ -436,6 +436,8 @@ describe('guaranteed combat rewards', () => {
     ])
     expect(game.rage).toBe(40)
     advance(game, 2.2)
+    expect(game.mode).toBe('upgrade')
+    game.choose(game.choices[0]!.id)
     expect(game.mode).toBe('victory')
     expect(game.score).toBe(2730)
     expect(finish).toHaveBeenCalledExactlyOnceWith(2730)
@@ -639,6 +641,8 @@ describe('street progression and pursuit', () => {
     game.enemies = []
     game.reserves = []
     advance(game, 1)
+    expect(game.mode).toBe('upgrade')
+    game.choose(game.choices[0]!.id)
     expect(game.snapshot().advancing).toBe(true)
     expect(game.wave).toBe(0)
     advance(game, 4)

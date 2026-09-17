@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { STAGES } from '../../game/content'
 import type { Snapshot, UpgradeId } from '../../game/types'
+import BuffDraft from './BuffDraft.vue'
+import RunBuild from './RunBuild.vue'
+import { blockAt } from '../../game/blocks'
 import GameIcon from './GameIcon.vue'
 defineProps<{ state: Snapshot; help: boolean; muted: boolean; lowMotion: boolean }>()
 defineEmits<{
@@ -41,8 +44,9 @@ defineEmits<{
         <div><kbd>Q</kbd><b>强制重连</b><span>怒气满后清场</span></div>
       </div>
       <div class="help-note">
-        清空街段后向右前进。把敌人打进人群，能连锁撞击并砸碎道具。<br />Esc
-        暂停。离开窗口自动暂停，每关开始时自动存档。
+        清空每个街段后三选一 Buff，再向右前进。Buff
+        持续整局，可叠加升级。把敌人打进人群，能连锁撞击并砸碎道具。<br />Esc
+        暂停。离开窗口自动暂停，每小关开始与选卡时自动存档。
       </div>
       <button class="button button-primary" @click="$emit('closeHelp')">
         懂了，开打 <GameIcon name="arrow" />
@@ -60,6 +64,10 @@ defineEmits<{
       <div class="chapter-number">0{{ state.stage + 1 }}</div>
       <h2 id="intro-title">{{ STAGES[state.stage]!.name }}</h2>
       <p>{{ STAGES[state.stage]!.story }}</p>
+      <p>
+        街段 {{ state.wave + 1 }} / {{ state.waveCount }} ·
+        {{ blockAt(STAGES[state.stage]!.city, state.wave).name }} · 全程 {{ state.total }} 关
+      </p>
       <div class="intro-tip">
         <GameIcon :name="state.stage === 3 ? 'shield' : 'keyboard'" />{{
           state.stage === 0
@@ -89,41 +97,20 @@ defineEmits<{
       <button class="button button-primary" @click="$emit('resume')">
         继续战斗<GameIcon name="play" />
       </button>
+      <RunBuild :build="state.build" />
       <div class="settings-row">
         <button @click="$emit('toggleSound')">
           <GameIcon :name="muted ? 'muted' : 'sound'" />声音 {{ muted ? '关闭' : '开启' }}</button
         ><button @click="$emit('toggleMotion')">震屏 {{ lowMotion ? '关闭' : '开启' }}</button>
       </div>
-      <button class="text-button" @click="$emit('menu')">返回首页 · 已保存本关起点</button>
+      <button class="text-button" @click="$emit('menu')">返回首页 · 已保存本小关起点</button>
     </section>
   </div>
-  <div v-else-if="state.mode === 'upgrade'" class="modal-layer upgrade-layer">
-    <section class="upgrade-dialog" role="dialog" aria-modal="true" aria-labelledby="upgrade-title">
-      <span class="eyebrow">OFFICE {{ state.stage + 1 }} CLEARED / 连接恢复</span>
-      <h2 id="upgrade-title">打得不错。<br /><span>领点员工福利。</span></h2>
-      <p>选择一项升级，带着满血进入下一座城市。</p>
-      <p class="reward-receipt">
-        本关击破奖励 +{{ state.bountyScore }} · 通关奖励 +{{ state.clearBonus }} 数据，已到账
-      </p>
-      <div class="upgrade-cards">
-        <button
-          v-for="(choice, i) in state.choices"
-          :key="choice.id"
-          class="upgrade-card"
-          @click="$emit('choose', choice.id)"
-        >
-          <div class="upgrade-card-top">
-            <span>0{{ i + 1 }}</span
-            ><span>{{ choice.label }}</span>
-          </div>
-          <span class="upgrade-icon">{{ choice.icon }}</span>
-          <h3>{{ choice.name }}</h3>
-          <p>{{ choice.description }}</p>
-          <div class="upgrade-select">就选这个 <GameIcon name="arrow" /></div>
-        </button>
-      </div>
-    </section>
-  </div>
+  <BuffDraft
+    v-else-if="state.mode === 'upgrade'"
+    :state="state"
+    @choose="$emit('choose', $event)"
+  />
   <div v-else-if="state.mode === 'gameover'" class="modal-layer">
     <section
       class="dialog result-dialog"
@@ -180,6 +167,7 @@ defineEmits<{
       <p class="reward-receipt">
         Boss 与精英奖励 +{{ state.bountyScore }} · 通关奖励 +{{ state.clearBonus }} 数据，已计入总分
       </p>
+      <RunBuild :build="state.build" />
       <div class="ending-joke">
         <span>系统通知</span><b>文件过大，请重新上传。</b><small>……明天再说。</small>
       </div>

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { RunSave } from './types'
 import { clearSave, readBest, readSave, writeBest, writeSave } from './storage'
 const entries = new Map<string, string>()
 beforeEach(() => {
@@ -26,6 +27,43 @@ describe('save data', () => {
     '{"version":1,"stage":0,"score":0,"upgrades":["coffee","coffee"]}',
   ])('rejects invalid storage: %s', (text) => {
     entries.set('vast-offline-save-v1', text)
+    expect(readSave()).toBeNull()
+  })
+  const run: RunSave = {
+    version: 2,
+    stage: 1,
+    wave: 3,
+    phase: 'draft',
+    seed: 123,
+    score: 5200,
+    hp: 128,
+    rage: 62,
+    kills: 58,
+    bestCombo: 30,
+    elapsed: 120,
+    bountyScore: 900,
+    clearBonus: 0,
+    upgrades: ['coffee', 'coffee', 'chain'],
+  }
+  it('round trips a stacked mid-city draft checkpoint', () => {
+    writeSave(run)
+    expect(readSave()).toEqual(run)
+  })
+  it.each([
+    { wave: 6 },
+    { wave: -1 },
+    { phase: 'playing' },
+    { seed: -1 },
+    { seed: 1.5 },
+    { hp: 0 },
+    { hp: 171 },
+    { rage: 101 },
+    { elapsed: null },
+    { bestCombo: -1 },
+    { upgrades: Array(6).fill('coffee') },
+    { stage: 0, wave: 0 },
+  ])('rejects invalid v2 checkpoint fields: %j', (invalid) => {
+    entries.set('vast-offline-save-v1', JSON.stringify({ ...run, ...invalid }))
     expect(readSave()).toBeNull()
   })
   it('retains the highest completed score', () => {

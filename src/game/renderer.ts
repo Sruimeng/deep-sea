@@ -281,10 +281,13 @@ export class GameRenderer {
     this.landmarks.add(sign)
   }
   private mergeRoom() {
-    this.room.updateMatrixWorld(true)
+    for (const block of [...this.room.children]) this.mergeBlock(block)
+  }
+  private mergeBlock(block: THREE.Object3D) {
+    block.updateMatrixWorld(true)
     const batches = new Map<THREE.Material, THREE.BufferGeometry[]>()
     const meshes: THREE.Mesh[] = []
-    this.room.traverse((node) => {
+    block.traverse((node) => {
       if (!(node instanceof THREE.Mesh) || Array.isArray(node.material)) return
       const geometry = (
         node.geometry.index ? node.geometry.toNonIndexed() : node.geometry.clone()
@@ -305,8 +308,9 @@ export class GameRenderer {
       const mesh = new THREE.Mesh(merged, material)
       mesh.castShadow = true
       mesh.receiveShadow = true
-      this.room.add(mesh)
+      block.add(mesh)
     })
+    block.position.set(0, 0, 0)
   }
   private fallback(kind: Actor['kind']): { body: THREE.Group; limbs: THREE.Group[] } {
     const body = new THREE.Group(),

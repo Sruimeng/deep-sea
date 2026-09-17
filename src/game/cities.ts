@@ -186,7 +186,8 @@ export function buildCityRoom(stage: Stage, material: MaterialFactory, segment =
     for (let x = -11; x <= 11; x += 3) s.box([1.6, 0.01, 0.1], [x, 0.07, 0], '#d4cba5')
   }
   if (segment > 0) {
-    buildDistrict(s, stage.city, segment)
+    if (segment >= 2 && segment <= 4) buildNewDistrict(s, stage.city, segment)
+    else buildDistrict(s, stage.city, segment)
     return s.group
   }
   if (stage.city === 'beijing') {
@@ -497,4 +498,146 @@ function buildDistrict(s: CitySet, city: City, segment: number) {
     s.box([27, 0.3, 0.6], [0, 4.6, -5.5], '#586784')
     sign(0, 4.8)
   }
+}
+
+function buildNewDistrict(s: CitySet, city: City, segment: number) {
+  const theme = THEMES[city]
+  const key = `${city}-${segment}`
+  const pavilion = (x: number, color: string) => {
+    for (const dx of [-2.4, 2.4]) s.cylinder(0.16, 3.8, [x + dx, 1.9, -5.8], theme.wood)
+    s.box([6, 0.35, 2.8], [x, 3.9, -5.8], color)
+    s.box([4.8, 0.4, 2], [x, 4.25, -5.8], color)
+  }
+  const shop = (x: number, label: string, color: string) => {
+    s.box([5.7, 4.6, 2], [x, 2.3, -6], theme.wall)
+    s.box([4.9, 2.5, 0.06], [x, 1.3, -4.97], '#24333d')
+    s.text(label, 4.8, 0.8, [x, 3.3, -4.93], color, '#222b39')
+    s.box([5.4, 0.12, 0.25], [x, 4.2, -4.8], color)
+  }
+  if (key === 'beijing-2') {
+    s.box([8, 3.6, 3], [0, 1.8, -6.7], '#a2523d')
+    pavilion(0, '#575d61')
+    s.cylinder(0.8, 1.2, [0, 4.6, -5.8], '#af7950')
+    for (const x of [-10, -6, 6, 10]) {
+      s.cylinder(0.35, 1.3, [x, 0.65, -4.8], '#ae9277')
+      s.sphere(0.48, [x, 1.5, -4.8], '#c6b399')
+    }
+  } else if (key === 'beijing-3') {
+    for (const x of [-11, 11]) {
+      s.box([0.14, 4, 0.2], [x, 2, -5], '#c4c9bf')
+      s.box([2.7, 1.6, 0.12], [x, 3.7, -4.9], '#eeeece')
+      s.box([1.1, 0.08, 0.85], [x, 3.15, -4.5], '#d5674e')
+    }
+    for (const z of [-3.4, 3.4]) s.box([23, 0.02, 0.08], [0, 0.08, z], '#eee5c2')
+    s.box([0.08, 0.02, 6.8], [0, 0.08, 0], '#eee5c2')
+    s.skyline(city)
+  } else if (key === 'beijing-4') {
+    s.box([27, 5, 1], [0, 2.5, -6], '#876657')
+    for (const x of [-10, -3, 4, 11]) {
+      s.box([4.6, 2.5, 0.08], [x, 2.6, -5.45], '#344751')
+      const art = s.box([1.4, 1.4, 0.2], [x, 2.6, -5.3], x < 0 ? '#e5a34c' : '#60a7a0')
+      art.rotation.z = Math.PI / 4
+    }
+    s.cylinder(0.6, 7, [-10, 3.5, -8], '#985e45')
+  } else if (key === 'shanghai-2') {
+    for (const [i, x] of [-10, -3.4, 3.4, 10].entries()) {
+      shop(x, ['ARCADE', '夜 · 唱片', 'OFFLINE', '24H 咖啡'][i]!, i % 2 ? '#ec81bb' : '#77dbed')
+      s.box([0.12, 4.8, 0.2], [x - 2.6, 2.4, -4.8], '#b884f1')
+    }
+  } else if (key === 'shanghai-3') {
+    s.box([35, 0.06, 12], [0, -0.35, -10], '#33677e')
+    s.box([13, 1.6, 3], [0, 0.5, -7.7], '#e9ddc2', 0.4)
+    s.box([8, 1.5, 2], [0, 2, -7.7], '#7196aa', 0.15)
+    s.box([9, 0.2, 2.5], [0, 2.85, -7.7], '#e4c765')
+    for (const x of [-10, -7, 7, 10]) s.cylinder(0.16, 1.3, [x, 0.65, -4.8], '#baa888')
+  } else if (key === 'shanghai-4') {
+    s.skyline(city)
+    for (const x of [-10, -5, 5, 10]) {
+      s.planter(x, -4.9, 'tree')
+      s.box([3.4, 0.5, 0.7], [x, 0.3, -4.4], '#abb99d')
+    }
+    s.box([8, 0.3, 2], [0, 3.8, -5.8], '#6f897c')
+    for (const x of [-3.7, 3.7]) s.box([0.2, 3.8, 0.2], [x, 1.9, -5.8], '#9eaf95')
+  } else if (key === 'hangzhou-2') {
+    for (let x = -12; x <= 12; x += 2) {
+      s.planter(x, -5.4 - Math.abs(x % 3), 'bamboo')
+      if (x % 4 === 0) s.sphere(0.7, [x, 0.3, -4.8], '#91a291', [1.3, 0.7, 1])
+    }
+  } else if (key === 'hangzhou-3') {
+    pavilion(-8, '#72695a')
+    pavilion(8, '#72695a')
+    for (const x of [-2.5, 2.5]) s.box([0.7, 4.5, 0.8], [x, 2.25, -5.5], '#ad7656')
+    s.box([7, 0.5, 2], [0, 4.5, -5.5], '#5e6c63')
+    s.cylinder(0.9, 1.4, [8, 2.6, -5.5], '#a99866')
+  } else if (key === 'hangzhou-4') {
+    for (const x of [-10, -3.3, 3.3, 10]) {
+      shop(x, '旧书 · 新故事', '#d4c89f')
+      for (let i = 0; i < 9; i++)
+        s.box(
+          [0.25, 0.5 + (i % 3) * 0.13, 0.5],
+          [x - 1.6 + i * 0.4, 0.5, -4.7],
+          i % 2 ? '#ad8066' : '#6b9588',
+        )
+      const umbrella = s.cylinder(1.3, 0.5, [x, 3.3, -4.8], '#85a8a3', 0.1)
+      umbrella.rotation.z = 0.1
+    }
+  } else if (key === 'california-2') {
+    s.box([35, 0.04, 10], [0, -0.3, -10], '#73b6c5')
+    for (const x of [-9, 9]) {
+      s.cylinder(0.1, 3.2, [x, 1.6, -4.9], '#dfb35e')
+      s.planter(x * 1.3, -6, 'palm')
+    }
+    for (let x = -9; x <= 9; x++) s.box([0.035, 1.25, 0.035], [x, 2.1, -4.9], '#f4e9ca')
+    for (const y of [1.5, 1.8, 2.1, 2.4, 2.7]) s.box([18, 0.035, 0.035], [0, y, -4.9], '#f4e9ca')
+    for (const z of [-3, 3]) s.box([20, 0.015, 0.08], [0, 0.08, z], '#f4e9ca')
+  } else if (key === 'california-3') {
+    s.box([14, 0.9, 4], [0, 0.45, -6.5], '#3c3548')
+    for (const x of [-7, 7]) {
+      s.box([0.25, 6, 0.25], [x, 3, -5.5], '#adb1b1')
+      s.box([1.8, 3.5, 1.3], [x, 1.8, -5.3], '#272536')
+      for (const y of [1, 2.6])
+        s.cylinder(0.55, 0.15, [x, y, -4.58], '#61526d').rotation.x = Math.PI / 2
+    }
+    s.box([14, 0.25, 0.3], [0, 6, -5.5], '#adb1b1')
+    for (let x = -6; x <= 6; x += 2) s.sphere(0.2, [x, 5.7, -5.3], x % 4 ? '#ed9cbd' : '#84d7d2')
+    s.text('NO SIGNAL / LIVE', 9, 1.8, [0, 3.4, -5], '#e7a7d2', '#352945')
+  } else if (key === 'california-4') {
+    for (const x of [-11, -7, 7, 11]) {
+      s.cylinder(1.9, 4 + Math.abs(x) / 3, [x, 1, -9], '#bf8966', 0.7, 6)
+    }
+    s.box([13, 0.4, 4], [0, 4, -5.8], '#d3b691')
+    for (const x of [-5, 0, 5]) {
+      s.box([1.3, 2.2, 1], [x, 1.1, -4.9], '#d37c60', 0.1)
+      s.box([1, 0.7, 0.06], [x, 1.7, -4.36], '#3a4951')
+      s.cylinder(0.1, 4, [x, 2, -6], '#ccbaa0')
+    }
+  } else if (key === 'shenzhen-2') {
+    for (const x of [-10, -3.3, 3.3, 10]) {
+      shop(x, '芯片 · 维修 · 刷机', '#88e0dc')
+      for (let i = 0; i < 6; i++)
+        s.box([0.55, 0.7, 0.12], [x - 2 + i * 0.8, 1.2, -4.8], i % 2 ? '#7297c1' : '#b897d2')
+    }
+  } else if (key === 'shenzhen-3') {
+    s.skyline(city)
+    for (const x of [-9, 0, 9]) {
+      s.cylinder(1.8, 0.08, [x, 0.1, -4.8], '#79abae', 1.8, 24)
+      s.box([1.2, 0.5, 0.7], [x, 2.7, -5.6], '#b4cdd1', 0.1)
+      for (const dx of [-1, 1])
+        for (const dz of [-0.6, 0.6]) {
+          s.box([2.4, 0.09, 0.1], [x, 2.7, -5.6 + dz], '#8fa4b6')
+          s.cylinder(0.65, 0.03, [x + dx, 2.9, -5.6 + dz], '#53677c', 0.65, 16)
+        }
+    }
+  } else {
+    for (const y of [0.9, 2.1, 3.3]) {
+      const pipe = s.cylinder(0.32, 27, [0, y, -5.8], '#63a9b4', 0.32, 12)
+      pipe.rotation.z = Math.PI / 2
+      for (const x of [-10, -3, 4, 11]) s.box([0.2, 0.85, 0.85], [x, y, -5.8], '#9ec4c4')
+    }
+    for (const x of [-11, 11]) {
+      s.cylinder(1, 4.5, [x, 2.25, -7], '#486f86')
+      s.box([0.25, 3.5, 0.1], [x, 2.25, -5.95], '#8ee7d7')
+    }
+  }
+  s.text(blockAt(city, segment).name, 5.8, 0.65, [0, 5.2, -5.1], '#f3e5ba', theme.wall)
 }

@@ -36,3 +36,26 @@ it('holds the contact pose during hit stop instead of freezing before the punch 
   renderer['updateActor'](game.hero, game, 0)
   expect(hand.position.x).toBe(contact)
 })
+
+it('batches each street separately and preserves distant world positions', () => {
+  const renderer = Object.create(GameRenderer.prototype) as GameRenderer
+  const room = new THREE.Group()
+  renderer['room'] = room
+  const material = new THREE.MeshStandardMaterial()
+  for (const x of [0, 135]) {
+    const block = new THREE.Group()
+    block.position.x = x
+    block.add(new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), material))
+    room.add(block)
+  }
+  renderer['mergeRoom']()
+  room.updateMatrixWorld(true)
+  expect(room.children).toHaveLength(2)
+  const bounds = room.children.map((block) => new THREE.Box3().setFromObject(block))
+  expect(bounds.map((box) => box.min.x)).toEqual([-1, 134])
+  expect(bounds.map((box) => box.max.x)).toEqual([1, 136])
+  room.traverse((node) => {
+    if (node instanceof THREE.Mesh) node.geometry.dispose()
+  })
+  material.dispose()
+})

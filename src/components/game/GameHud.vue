@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { blockAt } from '../../game/blocks'
 import { STAGES } from '../../game/content'
 import type { Snapshot } from '../../game/types'
 import GameIcon from './GameIcon.vue'
@@ -37,10 +38,10 @@ defineEmits<{ pause: [] }>()
     </div>
     <div class="stage-hud">
       <span>{{ STAGES[state.stage]!.location }}</span
-      ><b>{{ STAGES[state.stage]!.name }}</b>
+      ><b>{{ blockAt(STAGES[state.stage]!.city, state.wave).name }}</b>
       <div class="wave-pips">
-        <i v-for="n in 3" :key="n" :class="{ done: n <= state.wave + 1 }" />
-        <span>街段 {{ state.wave + 1 }} / 3</span>
+        <i v-for="n in state.waveCount" :key="n" :class="{ done: n <= state.wave + 1 }" />
+        <span>街段 {{ state.wave + 1 }} / {{ state.waveCount }}</span>
       </div>
       <div class="wave-progress" :aria-label="`本波击破 ${state.waveKills} / ${state.waveTotal}`">
         <i :style="{ width: `${(state.waveKills / Math.max(1, state.waveTotal)) * 100}%` }" />
@@ -52,6 +53,10 @@ defineEmits<{ pause: [] }>()
     <div class="score-hud">
       <span>RECOVERED DATA</span><strong>{{ state.score.toString().padStart(6, '0') }}</strong
       ><span>场上 {{ state.enemies }} · 增援 {{ state.reserves }}</span>
+      <span
+        >旅程 {{ state.completed }}/{{ state.total }} · Buff
+        {{ state.build.reduce((sum, item) => sum + item.level, 0) }} 级</span
+      >
     </div>
     <button class="icon-button pause-button" aria-label="暂停游戏" @click="$emit('pause')">
       <GameIcon name="pause" />

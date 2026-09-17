@@ -166,6 +166,6 @@ describe('specialist encounters', () => {
           .flat()
           .map((block) => block.name),
       ).size,
-    ).toBe(15)
+    ).toBe(30)
   })
 })

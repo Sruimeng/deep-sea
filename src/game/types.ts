@@ -2,7 +2,19 @@ export type Mode = 'menu' | 'intro' | 'playing' | 'paused' | 'upgrade' | 'gameov
 export type EnemyKind =
   'packet' | 'spinner' | 'guard' | 'charger' | 'leaper' | 'bomber' | 'medic' | 'boss'
 export type Action = 'attack' | 'jump' | 'dash' | 'pickup' | 'special'
-export type UpgradeId = 'keyboard' | 'dash' | 'coffee' | 'cable' | 'cache'
+export type UpgradeId =
+  | 'keyboard'
+  | 'dash'
+  | 'coffee'
+  | 'cable'
+  | 'cache'
+  | 'chain'
+  | 'quake'
+  | 'leech'
+  | 'aerial'
+  | 'armor'
+  | 'combo'
+  | 'throw'
 export interface Point {
   x: number
   z: number
@@ -101,6 +113,7 @@ export interface Upgrade {
   label: string
   description: string
   icon: string
+  maxLevel: number
 }
 export type City = 'beijing' | 'shanghai' | 'hangzhou' | 'california' | 'shenzhen'
 export interface Stage {
@@ -115,11 +128,31 @@ export interface Stage {
   story: string
   waves: EnemyKind[][]
 }
-export interface SaveData {
+export interface LegacySave {
   version: 1
   stage: number
   score: number
   upgrades: UpgradeId[]
+}
+export interface RunSave {
+  version: 2
+  stage: number
+  wave: number
+  phase: 'start' | 'draft'
+  seed: number
+  score: number
+  hp: number
+  rage: number
+  kills: number
+  bestCombo: number
+  elapsed: number
+  bountyScore: number
+  clearBonus: number
+  upgrades: UpgradeId[]
+}
+export type SaveData = LegacySave | RunSave
+export interface BuildItem extends Upgrade {
+  level: number
 }
 export interface CombatReward {
   id: number
@@ -168,6 +201,10 @@ export interface Snapshot {
   elapsed: number
   dashReady: boolean
   choices: Upgrade[]
+  build: BuildItem[]
+  completed: number
+  total: number
+  waveCount: number
 }
 export type Sound =
   | 'charge'
