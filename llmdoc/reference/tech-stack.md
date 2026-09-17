@@ -25,8 +25,10 @@ type: reference
 | `src/game/simulation.ts`                                        | 战斗与关卡状态；不依赖渲染                                                 |
 | `src/game/street.ts`                                            | 街段间距、边界与镜头目标位置                                               |
 | `src/game/attacks.ts`、`combat-feedback.ts`、`enemy-tactics.ts` | 招式时序、命中反馈、数字运动与敌人战术目标                                 |
+| `src/game/action-presentation.ts`、`skill-effects.ts`           | 招式姿势叠加与接触帧映射；技能几何特效、姿势残影与资源释放                 |
 | `src/game/renderer.ts`                                          | Three.js 场景、模型、动画与特效                                            |
-| `src/game/cities.ts`                                            | 五地办公室的程序场景与城市细节                                             |
+| `src/game/blocks.ts`、`enemy-models.ts`                         | 街段名称、地面与道具配置；三种新增敌人的程序模型                           |
+| `src/game/cities.ts`                                            | 五地十五个街段的程序场景与城市细节                                         |
 | `src/game/input.ts`、`audio.ts`                                 | 键盘/触控输入、合成音频                                                    |
 | `src/game/storage.ts`                                           | localStorage 存档与最高分                                                  |
 | `src/game/offline.ts`                                           | Service Worker 注册与离线缓存状态                                          |

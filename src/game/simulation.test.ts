@@ -384,7 +384,7 @@ describe('impact timing and enemy identities', () => {
   it('every office has a distinct city and all enemy kinds appear in the campaign', () => {
     expect(new Set(STAGES.map((stage) => stage.city)).size).toBe(5)
     expect(new Set(STAGES.flatMap((stage) => stage.waves.flat()))).toEqual(
-      new Set(['packet', 'spinner', 'guard', 'charger', 'boss']),
+      new Set(['packet', 'spinner', 'guard', 'charger', 'leaper', 'bomber', 'medic', 'boss']),
     )
   })
 })

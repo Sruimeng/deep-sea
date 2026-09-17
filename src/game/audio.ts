@@ -97,6 +97,10 @@ export class Audio {
   play(sound: Sound) {
     if (this.muted) return
     switch (sound) {
+      case 'charge':
+        this.tone(120, 0.18, 'sine', 0.35, 850)
+        this.tone(240, 0.18, 'triangle', 0.12, 1200)
+        break
       case 'swing':
         this.noise(0.1, 0.24, 1400)
         break
@@ -135,6 +139,7 @@ export class Audio {
         break
       case 'dash':
         this.tone(580, 0.13, 'triangle', 0.22, 70)
+        this.noise(0.14, 0.22, 2400)
         break
       case 'reward':
         ;[523, 659, 784, 1047].forEach((f, i) => this.tone(f, 0.24, 'sine', 0.38, f, i * 0.07))
@@ -149,6 +154,9 @@ export class Audio {
         this.tone(330, 0.045, 'square', 0.16)
         break
       case 'special':
+        this.noise(0.28, 0.65, 1800)
+        this.tone(85, 0.48, 'sine', 1.0, 24)
+        this.tone(1500, 0.22, 'triangle', 0.16, 180)
         ;[110, 165, 220, 330].forEach((f, i) =>
           this.tone(f, 0.45, 'sawtooth', 0.18, f * 2, i * 0.06),
         )

@@ -1,8 +1,9 @@
 import { attackMove } from './attacks'
 import { STREET, streetBounds, streetCenter } from './street'
+import { blockAt } from './blocks'
 import { enemyDestination } from './enemy-tactics'
 import { HIT_FEEDBACK } from './combat-feedback'
-import { ENEMY_STATS, STAGES, UPGRADES, WEAPON_NAMES } from './content'
+import { ENEMY_HINTS, ENEMY_NAMES, ENEMY_STATS, STAGES, UPGRADES, WEAPON_NAMES } from './content'
 import type {
   Actor,
   Controls,
@@ -200,18 +201,16 @@ export class Game {
   }
   private setupProps() {
     this.props = STAGES[this.stage]!.waves.flatMap((_, segment) =>
-      [
-        { id: ++this.nextId, kind: 'keyboard', x: -5, z: 1.5, hp: 20, broken: false },
-        { id: ++this.nextId, kind: 'chair', x: 1, z: -2.7, hp: 36, broken: false },
-        { id: ++this.nextId, kind: 'box', x: 6, z: 2.3, hp: 20, broken: false },
-        { id: ++this.nextId, kind: 'box', x: -8, z: -2.7, hp: 20, broken: false },
-      ].map((prop) => ({
+      blockAt(STAGES[this.stage]!.city, segment).props.map((prop) => ({
         ...prop,
-        kind: prop.kind as Prop['kind'],
+        id: ++this.nextId,
+        hp: prop.kind === 'chair' ? 36 : 20,
+        broken: false,
         x: prop.x + streetCenter(segment),
       })),
     )
   }
+
   private spawnWave() {
     this.advancing = false
     this.waveDelay = 0
@@ -221,10 +220,17 @@ export class Game {
     this.waveKills = this.spawnIndex = 0
     this.reinforcementTime = 0
     this.spawnReinforcements(this.crowdLimit)
+    const previous = STAGES.slice(0, this.stage)
+      .flatMap((stage) => stage.waves.flat())
+      .concat(STAGES[this.stage]!.waves.slice(0, this.wave).flat())
+    const newcomer = kinds.find((kind) => ENEMY_HINTS[kind] && !previous.includes(kind))
+    const hint = newcomer
+      ? `${ENEMY_NAMES[newcomer]} · ${ENEMY_HINTS[newcomer]}`
+      : blockAt(STAGES[this.stage]!.city, this.wave).name
     this.announce(
       kinds.includes('boss')
         ? '延迟之王上线。注意地面预警！'
-        : `街段 ${this.wave + 1} / 3 · ${this.stage === 0 && this.wave === 0 ? '三拳挑飞 → 空格追击' : STAGES[this.stage]!.subtitle}`,
+        : `街段 ${this.wave + 1} / 3 · ${hint}`,
     )
   }
   get crowdLimit() {
@@ -251,10 +257,23 @@ export class Game {
     this.toastTime = 4
   }
   private effect(kind: Effect['kind'], at: Point, color = '#f9cf00', text?: string, power = 1) {
-    const duration = kind === 'special' ? 0.75 : kind === 'text' ? 1 : 0.45
-    this.effects.push({
+    const duration =
+      kind === 'charge'
+        ? attackMove(5).contact
+        : kind === 'special'
+          ? 0.8
+          : kind === 'slash'
+            ? this.hero.strike > 2
+              ? 0.32
+              : 0.18
+            : kind === 'text'
+              ? 1
+              : 0.45
+    const effect: Effect = {
       id: ++this.nextId,
       kind,
+      strike: this.hero.strike,
+      height: kind === 'slash' ? this.hero.y : undefined,
       x: at.x,
       z: at.z,
       color,
@@ -263,12 +282,21 @@ export class Game {
       facing: this.hero.facing,
       life: duration,
       duration,
-    })
+    }
+    this.effects.push(effect)
+    return effect
   }
   tick(dt: number, controls: Controls) {
     if (this.mode !== 'playing') return
     dt = Math.min(dt, 0.04)
-    this.effects.forEach((effect) => (effect.life -= dt))
+    this.effects.forEach((effect) => {
+      effect.life =
+        effect.kind === 'charge'
+          ? this.hero.strike === 5 && this.pendingStrike
+            ? Math.max(0.001, this.hero.attack - this.hero.attackDuration + effect.duration)
+            : 0
+          : effect.life - dt
+    })
     this.effects = this.effects.filter((effect) => effect.life > 0)
     if (controls.pressed.has('attack')) this.attackBuffer = 0.2
     if (controls.pressed.has('dash')) this.dashBuffer = 0.24
@@ -758,6 +786,8 @@ export class Game {
     this.hero.attack = this.hero.attackDuration = attackMove(5).duration
     this.hero.cooldown = this.hero.attackDuration
     this.pendingStrike = true
+    this.effect('charge', this.hero)
+    this.sounds.push('charge')
   }
   private resolveSpecial() {
     const upgraded = this.upgrades.includes('cable')
@@ -765,7 +795,7 @@ export class Game {
       if (distance(enemy, this.hero) < (upgraded ? 12 : 7))
         this.hitEnemy(enemy, upgraded ? 110 : 80, 16, true, false)
     this.projectiles = this.projectiles.filter((p) => p.friendly)
-    this.effect('special', this.hero)
+    this.effect('special', this.hero).radius = upgraded ? 12 : 7
     this.sounds.push('special')
     this.announce('强 制 重 连 ！')
   }
@@ -798,6 +828,12 @@ export class Game {
         if (distance(enemy, this.hero) < 1.35 && this.hero.y < 0.9)
           this.damageHero(ENEMY_STATS.charger.damage, enemy)
       }
+      const leaping =
+        enemy.kind === 'leaper' && enemy.attack > 0 && enemy.hurt === 0 && enemy.hp > 0
+      if (leaping) {
+        enemy.vx = (enemy.target.x - enemy.x) / Math.max(0.06, enemy.attack)
+        enemy.vz = (enemy.target.z - enemy.z) / Math.max(0.06, enemy.attack)
+      }
       this.updateBody(enemy, dt)
       if (enemy.kind === 'hero') continue
       if (enemy.hp <= 0) {
@@ -818,7 +854,11 @@ export class Game {
         )
         this.announce('99% 护盾启动！打碎两侧发光中继器。')
       }
-      if (enemy.hurt > 0 || enemy.y > 0.1 || (enemy.kind === 'charger' && enemy.attack > 0))
+      if (
+        enemy.hurt > 0 ||
+        enemy.y > 0.1 ||
+        ((enemy.kind === 'charger' || enemy.kind === 'leaper') && enemy.attack > 0)
+      )
         continue
       const stats = ENEMY_STATS[enemy.kind]
       const dx = this.hero.x - enemy.x,
@@ -831,9 +871,11 @@ export class Game {
       }
       enemy.facing = Math.sign(dx) || enemy.facing
       const inRange =
-        enemy.kind === 'spinner' || enemy.kind === 'charger'
-          ? d < stats.range
-          : d < stats.range && Math.abs(dz) < 0.85
+        enemy.kind === 'medic'
+          ? this.patients(enemy).length > 0
+          : ['spinner', 'charger', 'bomber', 'leaper'].includes(enemy.kind)
+            ? d < stats.range
+            : d < stats.range && Math.abs(dz) < 0.85
       const attackers = this.enemies.filter(
         (other) => other.hp > 0 && other.hurt === 0 && (other.windup > 0 || other.attack > 0),
       ).length
@@ -842,6 +884,20 @@ export class Game {
         enemy.windup = stats.windup
         enemy.target = { x: this.hero.x, z: this.hero.z }
         if (enemy.kind === 'boss') this.bossWarning(enemy)
+        if (enemy.kind === 'leaper') {
+          const duration = stats.windup + 0.6
+          this.zones.push({
+            id: ++this.nextId,
+            ...enemy.target,
+            radius: 1.5,
+            life: duration,
+            duration,
+            fired: false,
+            kind: 'pounce',
+            ownerId: enemy.id,
+          })
+          this.sounds.push('warn')
+        }
         continue
       }
       const target = enemyDestination(enemy, this.hero, this.elapsed)
@@ -889,12 +945,51 @@ export class Game {
     this.announce(sweep ? '网线横扫！按 K 跳起来。' : '请求超时！离开红色预警区。')
     this.sounds.push('warn')
   }
+  private patients(medic: Actor) {
+    return this.enemies.filter(
+      (other) =>
+        other.id !== medic.id &&
+        other.kind !== 'boss' &&
+        other.kind !== 'medic' &&
+        other.hp > 0 &&
+        other.hp < other.maxHp &&
+        distance(other, medic) < 4.5,
+    )
+  }
   private enemyAttack(enemy: Actor) {
     if (enemy.kind === 'hero') return
     const stats = ENEMY_STATS[enemy.kind]
     enemy.cooldown = stats.cooldown
     enemy.attack = 0.3
     if (enemy.kind === 'boss') return
+    if (enemy.kind === 'medic') {
+      for (const ally of this.patients(enemy)) {
+        ally.hp = Math.min(ally.maxHp, ally.hp + 12)
+        this.effect('heal', ally, '#75f3b3')
+      }
+      this.effect('text', enemy, '#75f3b3', '补丁修复')
+      return
+    }
+    if (enemy.kind === 'bomber') {
+      this.zones.push({
+        id: ++this.nextId,
+        ...enemy.target,
+        radius: 1.8,
+        life: 1.1,
+        duration: 1.1,
+        fired: false,
+        kind: 'bomb',
+      })
+      this.sounds.push('shoot')
+      return
+    }
+    if (enemy.kind === 'leaper') {
+      enemy.y = 0.01
+      enemy.vy = 7.2
+      enemy.attack = 0.6
+      this.sounds.push('jump')
+      return
+    }
     if (enemy.kind === 'charger') {
       const dx = enemy.target.x - enemy.x,
         dz = enemy.target.z - enemy.z
@@ -982,13 +1077,33 @@ export class Game {
   }
   private updateZones(dt: number) {
     for (const zone of this.zones) {
+      if (zone.ownerId !== undefined) {
+        const owner = this.enemies.find((enemy) => enemy.id === zone.ownerId)
+        if (!owner || owner.hp <= 0 || owner.hurt > 0) {
+          zone.life = -1
+          continue
+        }
+      }
       zone.life -= dt
       if (zone.life > 0 || zone.fired) continue
       zone.fired = true
       this.effect('break', zone, '#ff644f')
       this.sounds.push('heavy')
-      if (distance(zone, this.hero) < zone.radius && (zone.kind !== 'sweep' || this.hero.y < 0.75))
-        this.damageHero(20, zone)
+      const groundAttack = zone.kind === 'sweep' || zone.kind === 'pounce'
+      if (distance(zone, this.hero) < zone.radius && (!groundAttack || this.hero.y < 0.75))
+        this.damageHero(
+          zone.kind === 'bomb'
+            ? ENEMY_STATS.bomber.damage
+            : zone.kind === 'pounce'
+              ? ENEMY_STATS.leaper.damage
+              : 20,
+          zone,
+        )
+      if (zone.kind === 'bomb') {
+        for (const prop of this.props)
+          if (!prop.broken && prop.kind !== 'relay' && distance(prop, zone) < zone.radius)
+            this.breakProp(prop)
+      }
     }
     this.zones = this.zones.filter((zone) => zone.life > -0.3)
   }

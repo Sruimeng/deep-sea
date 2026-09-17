@@ -1,5 +1,6 @@
 export type Mode = 'menu' | 'intro' | 'playing' | 'paused' | 'upgrade' | 'gameover' | 'victory'
-export type EnemyKind = 'packet' | 'spinner' | 'guard' | 'charger' | 'boss'
+export type EnemyKind =
+  'packet' | 'spinner' | 'guard' | 'charger' | 'leaper' | 'bomber' | 'medic' | 'boss'
 export type Action = 'attack' | 'jump' | 'dash' | 'pickup' | 'special'
 export type UpgradeId = 'keyboard' | 'dash' | 'coffee' | 'cable' | 'cache'
 export interface Point {
@@ -52,7 +53,8 @@ export interface Zone extends Point {
   life: number
   duration: number
   fired: boolean
-  kind: 'crash' | 'sweep'
+  kind: 'crash' | 'sweep' | 'bomb' | 'pounce'
+  ownerId?: number
 }
 export interface Drop extends Point {
   id: number
@@ -61,6 +63,8 @@ export interface Drop extends Point {
 }
 export type HitKind = 'block' | 'light' | 'heavy' | 'counter' | 'finish'
 export interface Effect extends Point {
+  strike?: number
+  radius?: number
   hitKind?: HitKind
   damage?: number
   height?: number
@@ -70,6 +74,7 @@ export interface Effect extends Point {
     | 'hit'
     | 'break'
     | 'special'
+    | 'charge'
     | 'text'
     | 'heal'
     | 'dash'
@@ -165,6 +170,7 @@ export interface Snapshot {
   choices: Upgrade[]
 }
 export type Sound =
+  | 'charge'
   | 'swing'
   | 'block'
   | 'punch'

@@ -12,12 +12,15 @@ type: guide
 | `beijing`、`shanghai`、`hangzhou`、`california`、`shenzhen` GLB | Tripo P2 生成的五地地标                             |
 | `art/*.blend`                                                   | 11 份正式可编辑模型源文件                           |
 | `art/manifest.json`                                             | 模型版本、生成/绑定任务 ID、面数、字节数和动作名    |
-| 城市办公室与道具                                                | `src/game/cities.ts`、`renderer.ts` 程序建模        |
+| 跳蚤、投弹手、维修蜂                                            | `src/game/enemy-models.ts` 程序建模，无额外下载资源 |
+| 城市街段与道具                                                  | `src/game/cities.ts`、`renderer.ts` 程序建模        |
 | 音效与背景节奏                                                  | `src/game/audio.ts` 使用 Web Audio 合成             |
 
 模型保留原始 P2 几何和 PBR 材质，每份约 2.2–2.7 万面；贴图最长边 1536，主角与 Boss 为 2048。11 份发布模型合计约 22.5 MB，准确体积以清单为准。
 
 主角动作：`idle`、`run`、`jab`、`cross`、`uppercut`、`kick`、`special`、`dash`、`jump`、`hurt`、`fall`、`sweep`、`lunge`、`land`。
+
+动作演出使用 `action-presentation.ts` 叠加位移、扭身与旋转；`skill-effects.ts` 生成弧光、冲击环、电路裂纹，并快照当前骨骼姿势作为短时残影。共享模型几何不随残影销毁，残影只释放自身材质与骨骼纹理；无需额外下载模型或贴图。
 
 ## 品牌来源
 

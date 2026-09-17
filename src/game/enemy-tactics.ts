@@ -7,11 +7,14 @@ export function enemyDestination(enemy: Actor, hero: Actor, time: number): Point
   const side = enemy.id % 2 ? 1 : -1
   const radial = { x: dx / distance, z: dz / distance }
   const tangent = { x: -radial.z * side, z: radial.x * side }
-  if (enemy.kind === 'spinner') {
+  if (enemy.kind === 'spinner' || enemy.kind === 'bomber' || enemy.kind === 'medic') {
     if (distance < 4)
       return { x: enemy.x + radial.x * 3 + tangent.x, z: enemy.z + radial.z * 3 + tangent.z }
     if (distance < 6) return { x: enemy.x + tangent.x * 1.5, z: enemy.z + tangent.z * 1.5 }
     return { x: hero.x + radial.x * 5, z: hero.z + radial.z * 5 }
+  }
+  if (enemy.kind === 'leaper') {
+    return { x: hero.x + side * 3, z: hero.z + Math.sin(time * 1.8 + enemy.id) * 2.1 }
   }
   if (enemy.kind === 'charger') {
     return {

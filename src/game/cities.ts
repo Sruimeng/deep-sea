@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
+import { blockAt } from './blocks'
 import type { City, Stage } from './types'
 
 type Position = [number, number, number]
@@ -158,17 +159,22 @@ class CitySet {
 
 export function buildCityRoom(stage: Stage, material: MaterialFactory, segment = 0) {
   const s = new CitySet(material),
-    theme = THEMES[stage.city]
+    theme = THEMES[stage.city],
+    block = blockAt(stage.city, segment)
   s.box([27, 0.5, 12], [0, -0.3, 0], theme.edge, 0.12)
-  s.box([27, 0.12, 11.8], [0, -0.01, 0], theme.floor)
-  for (let x = -12; x <= 12; x += stage.city === 'california' ? 0.65 : 2)
+  s.box([27, 0.12, 11.8], [0, -0.01, 0], block.floor)
+  for (
+    let x = -12;
+    x <= 12;
+    x += block.surface === 'wood' ? 0.65 : block.surface === 'asphalt' ? 100 : 2
+  )
     s.box([0.018, 0.008, 11.6], [x, 0.06, 0], theme.edge)
-  if (stage.city !== 'california')
+  if (block.surface === 'stone' || block.surface === 'tile')
     for (let z = -4; z <= 4; z += 2) s.box([26.6, 0.008, 0.018], [0, 0.06, z], theme.edge)
   s.box([35, 0.15, 6], [0, -0.5, -9], theme.sky)
   s.box([27, 0.12, 0.15], [0, 0.15, 5.7], '#f9cf00')
   const floorMark = s.text(
-    `0${segment + 1}  /  ${['ENTRY', 'SIDE STREET', 'LAST BLOCK'][segment]}  →`,
+    `0${segment + 1}  /  ${block.name}  →`,
     5.6,
     0.65,
     [0, 0.065, 4.5],
@@ -176,6 +182,13 @@ export function buildCityRoom(stage: Stage, material: MaterialFactory, segment =
   )
   floorMark.rotation.x = -Math.PI / 2
 
+  if (block.surface === 'asphalt') {
+    for (let x = -11; x <= 11; x += 3) s.box([1.6, 0.01, 0.1], [x, 0.07, 0], '#d4cba5')
+  }
+  if (segment > 0) {
+    buildDistrict(s, stage.city, segment)
+    return s.group
+  }
   if (stage.city === 'beijing') {
     s.box([27, 1.15, 0.4], [0, 0.57, -5.7], '#77706b')
     for (let row = 0; row < 4; row++)
@@ -274,4 +287,214 @@ export function buildCityRoom(stage: Stage, material: MaterialFactory, segment =
     s.text('SHENZHEN  /  CORE OFFLINE', 5.6, 0.75, [-6.3, 4.25, -5.35], '#f9cf00', '#252637')
   }
   return s.group
+}
+
+function buildDistrict(s: CitySet, city: City, segment: number) {
+  const name = blockAt(city, segment).name
+  const night = city === 'shanghai' || city === 'shenzhen'
+  const sign = (x = 0, y = 3.7) =>
+    s.text(
+      name,
+      5.8,
+      0.75,
+      [x, y, -5.1],
+      night ? '#c3e9ff' : '#fff0cb',
+      night ? '#27384d' : '#734c3a',
+    )
+  const rail = (color: string, z = -5.6) => {
+    s.box([26.8, 0.12, 0.15], [0, 1.15, z], color)
+    for (let x = -13; x <= 13; x += 2) s.box([0.12, 1.2, 0.12], [x, 0.6, z], color)
+  }
+  const container = (x: number, z: number, color: string, width = 6, y = 0) => {
+    s.box([width, 2.5, 2], [x, y + 1.25, z], color, 0.06)
+    for (let dx = -width / 2 + 0.25; dx < width / 2; dx += 0.4)
+      s.box([0.045, 2.25, 0.045], [x + dx, y + 1.25, z + 1.03], '#b3b6b1')
+    s.text(
+      'VAST / CARGO',
+      Math.min(width - 0.5, 3.8),
+      0.45,
+      [x, y + 1.4, z + 1.06],
+      '#e9eddd',
+      color,
+    )
+  }
+  const stall = (x: number, color: string, label: string) => {
+    s.box([4.2, 1.1, 1.35], [x, 0.55, -4.85], '#8b694a', 0.06)
+    for (const dx of [-2, 2]) s.cylinder(0.055, 3, [x + dx, 1.5, -5.2], '#604c3b')
+    for (let i = 0; i < 8; i++) {
+      const roof = s.box(
+        [0.54, 0.12, 2.3],
+        [x - 1.9 + i * 0.54, 2.85, -5.1],
+        i % 2 ? '#f7e6bd' : color,
+      )
+      roof.rotation.x = -0.12
+      s.box([0.54, 0.3, 0.08], [x - 1.9 + i * 0.54, 2.55, -3.94], i % 2 ? '#f7e6bd' : color)
+    }
+    s.text(label, 3.3, 0.5, [x, 1.65, -4.12], '#ffedbf', '#654b3d')
+    for (let i = 0; i < 6; i++) s.sphere(0.18, [x - 1.3 + i * 0.5, 1.3, -4.6], color)
+  }
+  if (city === 'beijing' && segment === 1) {
+    s.box([27, 3.7, 0.45], [0, 1.8, -6], '#72423b')
+    for (const x of [-9, -3, 4, 10]) {
+      stall(x, x < 0 ? '#b73f35' : '#cf9d42', x < 0 ? '热乎 · 烧饼' : '下班 · 夜宵')
+      s.cylinder(0.32, 0.5, [x, 3.65, -4.75], '#d44e3c')
+      s.cylinder(0.025, 0.32, [x, 3.24, -4.75], '#f6cb62')
+    }
+    s.box([27, 0.04, 0.04], [0, 3.98, -4.75], '#49352e')
+    for (const x of [-11.5, 11.5]) {
+      s.box([0.35, 4.6, 0.4], [x, 2.3, -5.65], '#8c3934')
+      s.box([2.2, 0.28, 1], [x, 4.5, -5.65], '#494d56')
+    }
+    sign(0, 4.5)
+  } else if (city === 'beijing') {
+    s.box([27, 4.2, 0.35], [0, 2.05, -6.2], '#45575b')
+    s.box([24, 2.5, 1.1], [0, 1.55, -5.65], '#b6c7c9', 0.2)
+    s.box([24, 0.22, 0.1], [0, 0.8, -5.05], '#b8333e')
+    for (let x = -10; x <= 10; x += 2.5) {
+      s.box([1.4, 0.95, 0.05], [x, 1.9, -5.05], '#293e50', 0.05)
+      s.box([0.05, 2.1, 0.06], [x + 1.1, 1.5, -5.04], '#566d75')
+    }
+    s.box([27, 0.03, 0.35], [0, 0.08, -3.85], '#ead17d')
+    for (const x of [-10, 0, 10]) {
+      s.box([0.5, 4.5, 0.5], [x, 2.25, -5.7], '#477b81')
+      s.box([4, 0.12, 0.3], [x, 4.1, -4.9], '#edf9ed')
+    }
+    sign(-5, 3.65)
+    s.text('末班车  23:59  →', 4.5, 0.6, [6, 3.65, -4.9], '#f9cf00', '#24333c')
+  } else if (city === 'shanghai' && segment === 1) {
+    s.skyline(city)
+    s.box([35, 0.05, 7], [0, -0.22, -9], '#315b74')
+    container(-8, -5.65, '#a35640')
+    container(-8, -5.65, '#3a647c', 6, 2.5)
+    container(8, -5.65, '#497a7c', 7)
+    for (const x of [-1.5, 5]) s.box([0.32, 6, 0.4], [x, 3, -7], '#d7ab55')
+    s.box([8.5, 0.42, 0.65], [1.8, 6, -7], '#d7ab55')
+    s.cylinder(0.055, 3, [2, 4.35, -6.6], '#adbac7')
+    s.box([0.9, 0.3, 0.6], [2, 2.8, -6.6], '#e6c070')
+    for (const x of [-12, -3, 11]) s.cylinder(0.22, 0.75, [x, 0.4, -4.2], '#d8b565')
+    sign(-1, 3.7)
+  } else if (city === 'shanghai') {
+    s.skyline(city)
+    rail('#a9bfd2')
+    const pad = s.cylinder(3.4, 0.015, [0, 0.065, 0], '#677789', 3.4, 48)
+    pad.receiveShadow = true
+    const h = s.text('H', 3, 3, [0, 0.084, 0], '#f4e1a3')
+    h.rotation.x = -Math.PI / 2
+    for (const x of [-10, -6, 7, 11]) {
+      s.box([2.3, 1.3, 1.7], [x, 0.65, -4.8], '#748997', 0.08)
+      for (let i = 0; i < 5; i++) s.box([1.9, 0.04, 0.06], [x, 0.4 + i * 0.17, -3.92], '#344653')
+      s.sphere(0.12, [x, 1.5, -4.8], '#f4635e')
+    }
+    s.box([4.4, 3.2, 2], [-1.2, 1.6, -6.5], '#35485b')
+    s.box([1.4, 2.3, 0.06], [-1.2, 1.15, -5.46], '#95b5c4')
+    sign(0, 3.65)
+  } else if (city === 'hangzhou' && segment === 1) {
+    s.box([35, 0.06, 11], [0, -0.4, -9], '#78aaa5')
+    rail('#815e45')
+    for (let x = -12; x <= 12; x += 3) {
+      s.box([0.22, 1.8, 0.22], [x, 0.9, -5.6], '#886547')
+      s.sphere(0.2, [x, 1.85, -5.6], '#d5bc8c')
+      s.sphere(0.5, [x + 1, -0.34, -8], '#618f77', [1, 0.05, 1])
+      s.sphere(0.12, [x + 1, -0.23, -8], '#e4b4af')
+    }
+    for (const x of [-9, 9]) {
+      s.box([0.3, 4, 0.35], [x, 2, -5.9], '#815b40')
+      s.box([5.5, 0.26, 2.4], [x, 4, -5.9], '#4d6d62')
+      s.box([4.3, 0.24, 1.8], [x, 4.3, -5.9], '#5e7c6d')
+      s.cylinder(0.18, 0.65, [x + 1.7, 3.3, -5.2], '#d9b670')
+    }
+    sign(0, 2.6)
+  } else if (city === 'hangzhou') {
+    s.box([31, 1, 7], [0, -0.2, -9], '#758c60')
+    for (let row = 0; row < 3; row++)
+      for (let x = -13; x <= 13; x += 1.5)
+        s.sphere(
+          0.72,
+          [x, 0.7 + row * 0.32, -6.5 - row * 1.7],
+          row % 2 ? '#577c50' : '#71955b',
+          [1, 0.65, 0.75],
+        )
+    stall(-6, '#638875', '龙井 · 新茶')
+    for (const x of [4, 6.5, 9]) {
+      s.cylinder(0.7, 0.7, [x, 0.35, -4.8], '#b19a68')
+      s.cylinder(0.73, 0.08, [x, 0.72, -4.8], '#76915a')
+    }
+    s.planter(-12, -4.7, 'bamboo')
+    s.planter(12, -4.7, 'bamboo')
+    sign(0, 3.8)
+  } else if (city === 'california' && segment === 1) {
+    s.box([36, 0.05, 10], [0, -0.28, -10], '#77adbe')
+    rail('#ecd3b6')
+    stall(-8, '#d97872', 'ICE CREAM')
+    stall(8, '#65a7b6', 'SURF RENTAL')
+    for (let i = 0; i < 3; i++) {
+      const board = s.sphere(
+        0.65,
+        [6.5 + i * 1.05, 1.45, -3.95],
+        ['#f3c85b', '#87d1c8', '#f0a184'][i]!,
+        [0.4, 2, 0.12],
+      )
+      board.rotation.z = -0.15 + i * 0.13
+    }
+    const wheel = new THREE.Mesh(
+      new THREE.TorusGeometry(2.9, 0.1, 6, 36),
+      new THREE.MeshStandardMaterial({ color: '#f0d8b1' }),
+    )
+    wheel.position.set(0, 3.4, -10)
+    s.group.add(wheel)
+    for (let i = 0; i < 8; i++) {
+      const a = (i * Math.PI) / 4
+      const x = Math.cos(a) * 2.9,
+        y = 3.4 + Math.sin(a) * 2.9
+      s.box([0.8, 0.7, 0.65], [x, y, -10], i % 2 ? '#d88577' : '#e8c27c', 0.12)
+      const spoke = s.box([0.045, 2.9, 0.045], [x / 2, 3.4 + Math.sin(a) * 1.45, -10], '#f0d8b1')
+      spoke.rotation.z = a - Math.PI / 2
+    }
+    sign(0, 2.1)
+  } else if (city === 'california') {
+    s.box([35, 0.1, 6], [0, -0.23, -9], '#bcaa89')
+    for (const x of [-12, 0, 12]) s.planter(x, -6, 'palm')
+    s.box([7.5, 2.5, 2.2], [-5.5, 1.65, -5.5], '#e6b55f', 0.22)
+    s.box([3.8, 1, 0.06], [-6, 2, -4.37], '#495a60')
+    s.box([4.6, 0.15, 0.6], [-6, 1.35, -4.15], '#f1d9aa')
+    for (const x of [-8, -3]) {
+      const tire = s.cylinder(0.5, 0.3, [x, 0.5, -4.45], '#343b42')
+      tire.rotation.x = Math.PI / 2
+    }
+    s.text('OFFLINE TACOS', 4.5, 0.65, [-5.7, 3.35, -4.4], '#8e4944', '#ffdaa2')
+    for (let x = -12; x <= 12; x += 4) s.box([0.08, 0.012, 2.7], [x, 0.075, 3.8], '#e7d7b5')
+    s.box([4, 0.9, 1.5], [8, 0.45, -4.8], '#849da2', 0.12)
+    s.box([2.2, 0.9, 1.4], [8.2, 1.25, -4.8], '#b9d5d3', 0.17)
+    sign(4, 3.8)
+  } else if (city === 'shenzhen' && segment === 1) {
+    container(-8, -5.5, '#586783', 7)
+    container(-8, -5.5, '#806b94', 7, 2.5)
+    container(5.5, -5.5, '#4b8380', 9)
+    for (let x = -12; x <= 12; x++) {
+      const stripe = s.box([0.52, 0.012, 0.5], [x, 0.075, -3.65], x % 2 ? '#e6c662' : '#2d3542')
+      stripe.rotation.y = -0.35
+    }
+    s.box([2, 1, 1.3], [11, 0.55, -4.9], '#d8ac4d', 0.1)
+    for (const x of [10.5, 11.5]) s.box([0.15, 3.8, 0.2], [x, 1.9, -4.15], '#546171')
+    s.box([1.4, 0.16, 1.1], [11, 0.5, -3.9], '#737f89')
+    sign(3, 3.6)
+  } else {
+    s.box([27, 5, 0.4], [0, 2.5, -6.5], '#172337')
+    for (const x of [-11, -8, -5, 5, 8, 11]) {
+      s.box([2.1, 3.9, 1.5], [x, 1.95, -5.2], '#1f2b3c', 0.08)
+      for (let y = 0.4; y < 3.9; y += 0.4) {
+        s.box([1.8, 0.22, 0.04], [x, y, -4.43], '#46566e')
+        s.box([0.5, 0.07, 0.05], [x - 0.5, y, -4.39], '#80e1de')
+      }
+    }
+    s.cylinder(1.35, 3.8, [0, 1.9, -5.4], '#415a80', 1.35, 12)
+    for (const y of [0.5, 1.4, 2.3, 3.2]) s.cylinder(1.42, 0.12, [0, y, -5.4], '#8abaf1', 1.42, 12)
+    for (const z of [-3.4, 3.4]) {
+      s.box([26, 0.02, 0.07], [0, 0.08, z], '#80d6e1')
+      for (let x = -12; x <= 12; x += 3)
+        s.box([0.06, 0.02, 1.2], [x, 0.08, z - Math.sign(z) * 0.55], '#7486b7')
+    }
+    s.box([27, 0.3, 0.6], [0, 4.6, -5.5], '#586784')
+    sign(0, 4.8)
+  }
 }

@@ -2,9 +2,12 @@ import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { clone } from 'three/addons/utils/SkeletonUtils.js'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
+import { actionPose, attackClipProgress } from './action-presentation'
+import { createSkillEffect, updateSkillEffect, isSkillEffect, HeroEchoes } from './skill-effects'
 import { attackMove } from './attacks'
 import { HIT_FEEDBACK, damagePose } from './combat-feedback'
 import { STAGES } from './content'
+import { buildSpecialist, isSpecialist } from './enemy-models'
 import { buildCityRoom } from './cities'
 import { cameraTarget, STREET, streetCenter } from './street'
 import type { Game } from './simulation'
@@ -13,6 +16,7 @@ import type { Actor, Effect, Prop } from './types'
 interface Visual {
   group: THREE.Group
   body: THREE.Group
+  choreography?: THREE.Group
   shadow: THREE.Mesh
   bar: THREE.Mesh
   mixer?: THREE.AnimationMixer
@@ -44,6 +48,7 @@ export class GameRenderer {
   private landmarks = new THREE.Group()
   private dynamic = new THREE.Group()
   private route = new THREE.Group()
+  private echoes = new HeroEchoes(this.dynamic)
   private cameraX: number | undefined
   private actors = new Map<number, Visual>()
   private props = new Map<number, THREE.Group>()
@@ -224,6 +229,7 @@ export class GameRenderer {
   private buildRoom(stage: number) {
     this.clearGroup(this.room)
     this.clearGroup(this.landmarks)
+    this.echoes.clear()
     this.currentStage = stage
     this.cameraX = undefined
     const info = STAGES[stage]!
@@ -378,13 +384,24 @@ export class GameRenderer {
         actions = {}
         asset.clips.forEach((clip) => (actions![clip.name] = mixer!.clipAction(clip)))
       }
+    } else if (isSpecialist(actor.kind)) {
+      const specialist = buildSpecialist(actor.kind, (color) => {
+        const material = this.mat(color).clone()
+        material.userData.actorOwned = true
+        flashMaterials.push(material)
+        return material
+      })
+      body = specialist.body
+      limbs = specialist.limbs
     } else {
       const fallback = this.fallback(actor.kind)
       body = fallback.body
       limbs = fallback.limbs
     }
     const rotating = new THREE.Group()
-    rotating.add(body)
+    const choreography = new THREE.Group()
+    choreography.add(body)
+    rotating.add(choreography)
     group.add(rotating)
     if (actor.kind === 'guard' && !asset)
       this.box(rotating, [1.05, 1.3, 0.16], [0, 1.1, 0.6], '#91acbe')
@@ -410,6 +427,22 @@ export class GameRenderer {
       telegraph.rotation.x = -Math.PI / 2
       telegraph.name = 'charge-warning'
       group.add(telegraph)
+    }
+    if (actor.kind === 'medic') {
+      const signal = new THREE.Mesh(
+        new THREE.RingGeometry(4.35, 4.5, 48),
+        new THREE.MeshBasicMaterial({
+          color: '#75f3b3',
+          transparent: true,
+          opacity: 0.45,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+        }),
+      )
+      signal.rotation.x = -Math.PI / 2
+      signal.position.y = 0.06
+      signal.name = 'repair-signal'
+      group.add(signal)
     }
     const shadow = new THREE.Mesh(
       new THREE.CircleGeometry(actor.kind === 'boss' ? 1.55 : 0.6, 24),
@@ -443,6 +476,7 @@ export class GameRenderer {
     return {
       group,
       body: rotating,
+      choreography,
       shadow,
       bar,
       limbs,
@@ -505,6 +539,21 @@ export class GameRenderer {
       body.rotation.x = actor.attack > 0 ? 0.16 : actor.windup > 0 ? -0.12 : 0
       if (actor.windup > 0) body.position.x = Math.sin(this.clock * 60) * 0.05
     }
+    if (actor.kind === 'leaper') {
+      body.rotation.x = actor.windup > 0 ? -0.22 : actor.attack > 0 ? 0.3 : 0
+      if (actor.windup > 0) body.position.y -= 0.15
+    }
+    if (actor.kind === 'bomber' && running) body.rotation.z += Math.sin(actor.walk * 7) * 0.04
+    if (actor.kind === 'medic') {
+      body.position.y += Math.sin(this.clock * 4 + actor.id) * 0.13
+      for (const side of ['left', 'right']) {
+        const wing = body.getObjectByName(`wing-${side}`)
+        if (wing)
+          wing.rotation.z = (side === 'left' ? -1 : 1) * (0.2 + Math.sin(this.clock * 25) * 0.2)
+      }
+      const signal = group.getObjectByName('repair-signal')
+      if (signal) signal.visible = actor.hp > 0 && actor.windup > 0
+    }
     if (actor.kind === 'boss') body.position.y += Math.sin(this.clock * 3) * 0.08
     if (limbs)
       limbs.forEach((limb, i) => {
@@ -565,7 +614,9 @@ export class GameRenderer {
         action.paused = attacking
         if (attacking && actor.attackDuration) {
           // Simulation owns contact time; hit stop must hold the fist at impact.
-          action.time = (1 - actor.attack / actor.attackDuration) * action.getClip().duration
+          action.time =
+            attackClipProgress(actor.strike, actor.attackDuration - actor.attack) *
+            action.getClip().duration
         } else if (desired === 'run') {
           action.time = ((actor.walk % 2.8) / 2.8) * action.getClip().duration
           action.paused = true
@@ -573,10 +624,25 @@ export class GameRenderer {
       }
       mixer.update(dt)
     } else if (attacking) body.rotation.x = Math.sin(actor.attack * 12) * -0.2
+    if (visual.choreography && isHero) {
+      const pose = actionPose(
+        attacking ? actor.strike : 0,
+        attacking ? actor.attackDuration - actor.attack : 0,
+      )
+      visual.choreography.position.y = pose.lift
+      visual.choreography.rotation.set(pose.lean, pose.twist, 0)
+      visual.choreography.scale.set(1, pose.stretch, 1)
+    }
     if (isHero && !visual.asset && game.dashTime > 0) body.rotation.z = -actor.facing * 0.3
     visual.flashMaterials?.forEach((material) => {
       material.emissive.set(
-        actor.hurt > 0 && !isHero ? '#fff1b2' : actor.windup > 0 ? '#ff412a' : '#000000',
+        actor.hurt > 0 && !isHero
+          ? '#fff1b2'
+          : actor.windup > 0
+            ? actor.kind === 'medic'
+              ? '#75f3b3'
+              : '#ff412a'
+            : '#000000',
       )
       material.emissiveIntensity =
         actor.hurt > 0 && !isHero
@@ -648,6 +714,11 @@ export class GameRenderer {
     return group
   }
   private effectObject(effect: Effect) {
+    if (isSkillEffect(effect)) {
+      const effectGroup = createSkillEffect(effect)
+      this.dynamic.add(effectGroup)
+      return effectGroup
+    }
     const group = new THREE.Group()
     if (effect.kind === 'damage') {
       const feedback = HIT_FEEDBACK[effect.hitKind ?? 'light']
@@ -709,20 +780,6 @@ export class GameRenderer {
       const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthTest: false }))
       sprite.scale.set(effect.text && effect.text.length > 4 ? 3.8 : 2, 0.6, 1)
       group.add(sprite)
-    } else if (effect.kind === 'slash') {
-      const arc = new THREE.Mesh(
-        new THREE.RingGeometry(0.8, 1.02, 32, 1, -1.2, 2.4),
-        new THREE.MeshBasicMaterial({
-          color: effect.color,
-          side: THREE.DoubleSide,
-          transparent: true,
-          opacity: 0.85,
-          depthWrite: false,
-        }),
-      )
-      arc.rotation.x = -Math.PI / 2 + (effect.power === 2 ? 0.65 : 0.25)
-      arc.rotation.z = effect.facing === -1 ? Math.PI : 0
-      group.add(arc)
     } else if (effect.kind === 'impact') {
       const canvas = document.createElement('canvas')
       canvas.width = canvas.height = 256
@@ -778,7 +835,7 @@ export class GameRenderer {
         ray.rotation.z = -ray.userData.angle
         group.add(ray)
       }
-    } else if (effect.kind === 'special' || effect.kind === 'reward') {
+    } else if (effect.kind === 'reward') {
       const ring = new THREE.Mesh(
         new THREE.TorusGeometry(1, 0.08, 6, 64),
         new THREE.MeshBasicMaterial({ color: effect.color, transparent: true }),
@@ -896,25 +953,49 @@ export class GameRenderer {
       active.add(zone.id)
       let model = this.ephemeral.get(zone.id)
       if (!model) {
-        model = new THREE.Mesh(
-          new THREE.RingGeometry(0.85, 1, 48),
+        const color =
+          zone.kind === 'bomb' ? '#ffb34e' : zone.kind === 'pounce' ? '#c294ff' : '#ff503a'
+        const group = new THREE.Group()
+        const ring = new THREE.Mesh(
+          new THREE.RingGeometry(0.87, 1, 48),
           new THREE.MeshBasicMaterial({
-            color: '#ff503a',
+            color,
             transparent: true,
-            opacity: 0.75,
+            opacity: 0.8,
             side: THREE.DoubleSide,
             depthWrite: false,
           }),
         )
-        model.rotation.x = -Math.PI / 2
+        ring.rotation.x = -Math.PI / 2
+        group.add(ring)
+        const fill = new THREE.Mesh(
+          new THREE.CircleGeometry(1, 40),
+          new THREE.MeshBasicMaterial({
+            color,
+            transparent: true,
+            opacity: 0.15,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+          }),
+        )
+        fill.rotation.x = -Math.PI / 2
+        fill.position.y = 0.01
+        fill.name = 'countdown'
+        group.add(fill)
+        if (zone.kind === 'bomb') {
+          const bomb = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 8), this.mat('#3f3c52'))
+          bomb.position.y = 0.25
+          group.add(bomb)
+          this.box(group, [0.04, 0.16, 0.04], [0, 0.47, 0], '#f9cf00')
+        }
+        model = group
         this.dynamic.add(model)
         this.ephemeral.set(zone.id, model)
       }
-      model.position.set(zone.x, 0.06, zone.z)
+      model.position.set(zone.x, 0.07, zone.z)
       model.scale.setScalar(zone.radius)
-      ;(model as THREE.Mesh).material instanceof THREE.Material &&
-        ((model as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>).material.opacity =
-          0.35 + Math.abs(Math.sin(this.clock * 12)) * 0.5)
+      const countdown = model.getObjectByName('countdown')
+      countdown?.scale.setScalar(0.1 + 0.9 * (1 - Math.max(0, zone.life) / zone.duration))
     }
     for (const drop of game.drops) {
       active.add(drop.id)
@@ -955,7 +1036,7 @@ export class GameRenderer {
         const unit =
           (this.camera.top - this.camera.bottom) / this.camera.zoom / this.host.clientHeight
         model.scale.setScalar(pixels * unit * pose.scale)
-        model.position.y = (effect.height ?? 1.4) + 0.6 + pose.rise + (effect.lane ?? 0) * 0.35
+        model.position.y = (effect.height ?? 1.4) + 1.35 + pose.rise + (effect.lane ?? 0) * 0.35
         model.position.x += (effect.facing ?? 1) * (pose.drift + (effect.lane ?? 0) * 0.48)
         const screen = model.position.clone().project(this.camera)
         screen.x = THREE.MathUtils.clamp(screen.x, -0.8, 0.8)
@@ -988,19 +1069,14 @@ export class GameRenderer {
           ;(child as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>).material.opacity =
             1 - progress
         })
-      } else if (effect.kind === 'slash') {
-        model.scale.setScalar((effect.power ?? 1) * (0.8 + progress * 1.3))
-        model.position.y = 1.1 + progress * 0.5
-        const arc = model.children[0] as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>
-        arc.material.opacity = (1 - progress) * 0.85
+      } else if (isSkillEffect(effect)) {
+        updateSkillEffect(model, effect, this.lowMotion)
       } else if (effect.kind === 'reward') {
         model.position.y = 0.1
         model.scale.setScalar(0.4 + progress * 2)
         const ring = model.children[0] as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>
         ring.material.opacity = 1 - progress
-      } else if (effect.kind === 'special')
-        model.scale.setScalar(1 + progress * (game.upgrades.includes('cable') ? 12 : 7))
-      else if (effect.kind !== 'text')
+      } else if (effect.kind !== 'text')
         model.children.forEach((child) => {
           const angle = child.userData.angle,
             speed = child.userData.speed
@@ -1020,6 +1096,16 @@ export class GameRenderer {
         this.ephemeral.delete(id)
         this.handledEffects.delete(id)
       }
+    if (game.mode !== 'playing' && game.mode !== 'paused') this.echoes.clear()
+    const heroVisual = this.actors.get(game.hero.id)
+    if (heroVisual) {
+      const active =
+        game.mode === 'playing' &&
+        game.hero.hp > 0 &&
+        game.hitStop === 0 &&
+        (game.dashTime > 0 || (game.hero.attack > 0 && [4, 6, 7, 8].includes(game.hero.strike)))
+      this.echoes.update(heroVisual.body, game.hero, active, dt, this.lowMotion)
+    }
     this.renderer.render(this.scene, this.camera)
   }
   private disposeObject(object: THREE.Object3D, includeAssets = true) {
@@ -1081,6 +1167,7 @@ export class GameRenderer {
   dispose() {
     this.disposed = true
     this.size.disconnect()
+    this.echoes.clear()
     this.clearActors()
     this.clearGroup(this.room)
     this.clearGroup(this.landmarks)
