@@ -1,11 +1,15 @@
 <script setup lang="ts">
+import { useLocale } from '../../i18n/useLocale'
 import { computed, onMounted, useTemplateRef } from 'vue'
+import { DIFFICULTIES } from '../../game/difficulty'
 import { STAGES } from '../../game/content'
 import { blockAt } from '../../game/blocks'
 import { upgradeBenefit } from '../../game/roguelike'
 import type { Snapshot, UpgradeId } from '../../game/types'
 import RunBuild from './RunBuild.vue'
 import GameIcon from './GameIcon.vue'
+
+const { t } = useLocale()
 const props = defineProps<{ state: Snapshot }>()
 defineEmits<{ choose: [id: UpgradeId] }>()
 const title = useTemplateRef('title')
@@ -17,7 +21,7 @@ const next = computed(() =>
     ? '领取并结算'
     : props.state.wave === props.state.waveCount - 1
       ? '满血进入下一城'
-      : '回复 20% 生命，向右前进',
+      : t('回复 {0}% 生命，向右前进', { '0': Math.round(props.state.clearHeal * 100) }),
 )
 </script>
 <template>
@@ -28,46 +32,77 @@ const next = computed(() =>
       aria-modal="true"
       aria-labelledby="upgrade-title"
     >
-      <span class="eyebrow"
-        >街段 {{ state.completed }} / {{ state.total }} CLEARED ·
-        {{ blockAt(STAGES[state.stage]!.city, state.wave).name }}</span
+      <span class="eyebrow">{{
+        t('街段 {0} / {1} CLEARED · {2}', {
+          '0': state.completed,
+          '1': state.total,
+          '2': blockAt(STAGES[state.stage]!.city, state.wave).name,
+        })
+      }}</span>
+      <h2 id="upgrade-title" ref="title" tabindex="-1">
+        {{ t('再强一点。') }}<span>{{ t('选你的下一招。') }}</span>
+      </h2>
+      <p>{{ t('三选一 · Buff 持续整局，可叠至 5 级 · {0}', { '0': next }) }}</p>
+      <div
+        class="draft-progress"
+        :aria-label="t('街段 {0} / {1}', { '0': state.completed, '1': state.total })"
       >
-      <h2 id="upgrade-title" ref="title" tabindex="-1">再强一点。<span>选你的下一招。</span></h2>
-      <p>三选一 · Buff 持续整局，可叠至 5 级 · {{ next }}</p>
-      <div class="draft-progress" :aria-label="`已完成 ${state.completed} / ${state.total} 关`">
         <i :style="{ width: `${(state.completed / state.total) * 100}%` }" />
       </div>
+      <p class="draft-shortcuts">{{ t('按 1 / 2 / 3 直接选卡，也可 Tab + Enter') }}</p>
       <div class="upgrade-cards">
         <button
-          v-for="choice in state.choices"
+          v-for="(choice, index) in state.choices"
           :key="choice.id"
           class="upgrade-card"
+          :aria-keyshortcuts="String(index + 1)"
           :class="{ stacking: level(choice.id) > 0 }"
           @click="$emit('choose', choice.id)"
         >
           <div class="upgrade-card-top">
-            <span>{{ choice.label }}流</span
-            ><span>{{ level(choice.id) ? '叠加升级' : '新能力' }}</span>
+            <kbd class="buff-key">{{ index + 1 }}</kbd>
+            <span>{{ t('{0}流', { '0': choice.label }) }}</span
+            ><span>{{ t(level(choice.id) ? '叠加升级' : '新能力') }}</span>
           </div>
           <span class="upgrade-icon">{{ choice.icon }}</span>
-          <h3>{{ choice.name }}</h3>
+          <h3>{{ t(choice.name) }}</h3>
           <b class="buff-level"
             >{{ level(choice.id) ? `Lv.${level(choice.id)} → ` : '' }}Lv.{{ level(choice.id) + 1 }}
             <small>/ {{ choice.maxLevel }}</small></b
           >
-          <p>{{ choice.description }}</p>
-          <div class="buff-benefit">{{ upgradeBenefit(choice.id, level(choice.id) + 1) }}</div>
+          <p>{{ t(choice.description) }}</p>
+          <div class="buff-benefit">
+            {{
+              t(
+                upgradeBenefit(
+                  choice.id,
+                  level(choice.id) + 1,
+                  DIFFICULTIES[state.difficulty].healing,
+                ),
+              )
+            }}
+          </div>
           <div class="upgrade-select">
-            {{ final ? '领取并结算' : '就选这个' }} <GameIcon name="arrow" />
+            {{ t(final ? '领取并结算' : '就选这个') }} <GameIcon name="arrow" />
           </div>
         </button>
       </div>
-      <RunBuild :build="state.build" />
-      <p class="draft-save">已保存选卡进度 · 刷新保留当前候选 · 失败从本小关起点重试</p>
+      <RunBuild :build="state.build" :difficulty="state.difficulty" />
+      <p class="draft-save">{{ t('已保存选卡进度 · 刷新保留当前候选 · 失败从本小关起点重试') }}</p>
     </section>
   </div>
 </template>
 <style scoped>
+.buff-key {
+  padding: 2px 7px;
+  font: 700 14px monospace;
+  border: 1px solid #f9cf0070;
+  color: #f9cf00;
+}
+.draft-shortcuts {
+  margin-top: 14px;
+  color: #f9cf00 !important;
+}
 .upgrade-layer {
   align-items: flex-start;
 }

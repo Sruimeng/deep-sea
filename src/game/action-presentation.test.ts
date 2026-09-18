@@ -82,7 +82,7 @@ describe('action presentation', () => {
   })
   it('emits charge first and applies special damage only at the contact frame', () => {
     const game = new Game()
-    game.start()
+    game.start(undefined, 'casual')
     game.begin()
     game.rage = 100
     const enemy = game.enemies[0]!
@@ -103,7 +103,7 @@ describe('action presentation', () => {
   })
   it('keeps charge particles attached to the windup during slow motion', () => {
     const game = new Game()
-    game.start()
+    game.start(undefined, 'casual')
     game.begin()
     game.rage = 100
     game.slowTime = 0.6

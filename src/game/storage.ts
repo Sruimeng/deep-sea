@@ -1,3 +1,4 @@
+import { isDifficulty, type Difficulty } from './difficulty'
 import { STAGES, UPGRADES } from './content'
 import { completedBefore, levelOf } from './roguelike'
 import type { SaveData } from './types'
@@ -16,6 +17,7 @@ export function readSave(): SaveData | null {
       if (s.upgrades.length >= STAGES.length || new Set(s.upgrades).size !== s.upgrades.length)
         return null
     } else if (s.version === 2) {
+      if (s.difficulty !== undefined && !isDifficulty(s.difficulty)) return null
       if (!Number.isInteger(s.wave) || s.wave < 0 || s.wave >= STAGES[s.stage]!.waves.length)
         return null
       if (s.phase !== 'start' && s.phase !== 'draft') return null
@@ -51,16 +53,24 @@ export function clearSave() {
     /* Storage is optional. */
   }
 }
-export function readBest() {
+export function readBest(difficulty: Difficulty = 'casual') {
   try {
-    return Math.max(0, Number(localStorage.getItem(BEST_KEY)) || 0)
+    return Math.max(
+      0,
+      Number(
+        localStorage.getItem(difficulty === 'casual' ? BEST_KEY : `${BEST_KEY}-${difficulty}`),
+      ) || 0,
+    )
   } catch {
     return 0
   }
 }
-export function writeBest(score: number) {
+export function writeBest(score: number, difficulty: Difficulty = 'casual') {
   try {
-    localStorage.setItem(BEST_KEY, String(Math.max(readBest(), score)))
+    localStorage.setItem(
+      difficulty === 'casual' ? BEST_KEY : `${BEST_KEY}-${difficulty}`,
+      String(Math.max(readBest(difficulty), score)),
+    )
   } catch {
     /* Storage is optional. */
   }

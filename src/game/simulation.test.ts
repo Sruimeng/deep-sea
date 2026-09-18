@@ -36,7 +36,7 @@ function isolate(game: Game, kind: Actor['kind'] = 'packet') {
 describe('combat', () => {
   it('requires the briefing to be dismissed and freezes on pause', () => {
     const game = new Game()
-    game.start()
+    game.start(undefined, 'casual')
     advance(game, 3, controls([], 1, 0, true))
     expect(game.elapsed).toBe(0)
     game.begin()
@@ -255,69 +255,72 @@ describe('boss and progression', () => {
   })
 })
 
-it('a movement-and-attack bot can finish the campaign without modifying health or enemies', () => {
-  const game = new Game()
-  game.start()
-  game.seed = 741
-  const routes: string[] = []
-  for (
-    let frame = 0;
-    frame < 60 * 1200 && game.mode !== 'victory' && game.mode !== 'gameover';
-    frame++
-  ) {
-    if (game.mode === 'intro') {
-      routes.push(String(game.stage))
-      game.begin()
-    }
-    if (game.mode === 'upgrade') {
-      const preferred = ['keyboard', 'coffee', 'cable', 'cache', 'dash'] as const
-      const choice =
-        preferred.find((id) => game.choices.some((option) => option.id === id)) ??
-        game.choices[0]!.id
-      game.choose(choice)
-      continue
-    }
-    const h = game.hero
-    const relay = game.props.find((prop) => prop.kind === 'relay' && !prop.broken)
-    const nearest = game.enemies
-      .filter((enemy) => enemy.hp > 0)
-      .sort((a, b) => Math.hypot(a.x - h.x, a.z - h.z) - Math.hypot(b.x - h.x, b.z - h.z))[0]
-    const target = relay || nearest
-    const input = controls([], game.advancing ? 1 : 0, 0, !game.advancing)
-    if (nearest?.launchTime && nearest.hp > 0 && nearest.y > 0.15) input.pressed.add('dash')
-    if (target) {
-      const dx = target.x - h.x,
-        dz = target.z - h.z
-      input.x = Math.abs(dx) > 1.1 ? Math.sign(dx) : Math.abs(dx) < 0.7 ? -Math.sign(dx) : 0
-      input.z = Math.abs(dz) > 0.3 ? Math.sign(dz) : 0
-      if (!input.x && h.facing !== Math.sign(dx)) input.x = Math.sign(dx) * 0.01
-      if (
-        nearest?.kind === 'guard' ||
-        game.zones.some((zone) => zone.kind === 'sweep' && zone.life < 0.5)
-      )
-        input.pressed.add('jump')
-      if (
-        game.zones.some(
-          (zone) =>
-            zone.kind === 'crash' && Math.hypot(h.x - zone.x, h.z - zone.z) < zone.radius + 0.3,
-        )
-      ) {
-        input.z = h.z > 0 ? -1 : 1
-        input.pressed.add('dash')
+it.each(['casual', 'standard'] as const)(
+  'a movement-and-attack bot can finish the %s campaign without modifying health or enemies',
+  (difficulty) => {
+    const game = new Game()
+    game.start(undefined, difficulty)
+    game.seed = 741
+    const routes: string[] = []
+    for (
+      let frame = 0;
+      frame < 60 * 1200 && game.mode !== 'victory' && game.mode !== 'gameover';
+      frame++
+    ) {
+      if (game.mode === 'intro') {
+        routes.push(String(game.stage))
+        game.begin()
       }
+      if (game.mode === 'upgrade') {
+        const preferred = ['keyboard', 'coffee', 'cable', 'cache', 'dash'] as const
+        const choice =
+          preferred.find((id) => game.choices.some((option) => option.id === id)) ??
+          game.choices[0]!.id
+        game.choose(choice)
+        continue
+      }
+      const h = game.hero
+      const relay = game.props.find((prop) => prop.kind === 'relay' && !prop.broken)
+      const nearest = game.enemies
+        .filter((enemy) => enemy.hp > 0)
+        .sort((a, b) => Math.hypot(a.x - h.x, a.z - h.z) - Math.hypot(b.x - h.x, b.z - h.z))[0]
+      const target = relay || nearest
+      const input = controls([], game.advancing ? 1 : 0, 0, !game.advancing)
+      if (nearest?.launchTime && nearest.hp > 0 && nearest.y > 0.15) input.pressed.add('dash')
+      if (target) {
+        const dx = target.x - h.x,
+          dz = target.z - h.z
+        input.x = Math.abs(dx) > 1.1 ? Math.sign(dx) : Math.abs(dx) < 0.7 ? -Math.sign(dx) : 0
+        input.z = Math.abs(dz) > 0.3 ? Math.sign(dz) : 0
+        if (!input.x && h.facing !== Math.sign(dx)) input.x = Math.sign(dx) * 0.01
+        if (
+          nearest?.kind === 'guard' ||
+          game.zones.some((zone) => zone.kind === 'sweep' && zone.life < 0.5)
+        )
+          input.pressed.add('jump')
+        if (
+          game.zones.some(
+            (zone) =>
+              zone.kind === 'crash' && Math.hypot(h.x - zone.x, h.z - zone.z) < zone.radius + 0.3,
+          )
+        ) {
+          input.z = h.z > 0 ? -1 : 1
+          input.pressed.add('dash')
+        }
+      }
+      if (game.rage >= 100 && !game.shield) input.pressed.add('special')
+      game.tick(1 / 60, input)
     }
-    if (game.rage >= 100 && !game.shield) input.pressed.add('special')
-    game.tick(1 / 60, input)
-  }
-  expect({
-    mode: game.mode,
-    stage: game.stage,
-    wave: game.wave,
-    hp: game.hero.hp,
-    enemies: game.enemies.map((e) => ({ kind: e.kind, hp: e.hp })),
-    routes,
-  }).toMatchObject({ mode: 'victory', stage: 4, routes: ['0', '1', '2', '3', '4'] })
-})
+    expect({
+      mode: game.mode,
+      stage: game.stage,
+      wave: game.wave,
+      hp: game.hero.hp,
+      enemies: game.enemies.map((e) => ({ kind: e.kind, hp: e.hp })),
+      routes,
+    }).toMatchObject({ mode: 'victory', stage: 4, routes: ['0', '1', '2', '3', '4'] })
+  },
+)
 
 describe('impact timing and enemy identities', () => {
   it('freezes simulation on contact, then resumes without applying a second hit', () => {
@@ -616,7 +619,7 @@ describe('crowd waves and action moves', () => {
     const score = game.score
     advance(game, 0.2)
     expect(game.score).toBe(score)
-    game.start()
+    game.start(undefined, 'casual')
     expect(game.reserves).toHaveLength(0)
     expect(game.milestone).toBeNull()
   })

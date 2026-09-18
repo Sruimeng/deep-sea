@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useLocale } from '../../i18n/useLocale'
 import { blockAt } from '../../game/blocks'
 import { STAGES } from '../../game/content'
 import type { Snapshot } from '../../game/types'
@@ -6,6 +7,8 @@ import GameIcon from './GameIcon.vue'
 import CombatRewards from './CombatRewards.vue'
 import BattleMilestone from './BattleMilestone.vue'
 import StreetPrompt from './StreetPrompt.vue'
+
+const { t } = useLocale()
 defineProps<{ state: Snapshot }>()
 defineEmits<{ pause: [] }>()
 </script>
@@ -15,12 +18,13 @@ defineEmits<{ pause: [] }>()
       <div class="player-avatar"><img src="/brand/tripo-mark.svg" alt="Tripo" /></div>
       <div class="player-bars">
         <div class="bar-label">
-          <b>最后一位打工人</b><span>{{ Math.ceil(state.hp) }} / {{ state.maxHp }}</span>
+          <b>{{ t('最后一位打工人') }}</b
+          ><span>{{ Math.ceil(state.hp) }} / {{ state.maxHp }}</span>
         </div>
         <div
           class="health-track"
           role="progressbar"
-          aria-label="生命值"
+          :aria-label="t('生命值')"
           :aria-valuenow="Math.ceil(state.hp)"
           :aria-valuemax="state.maxHp"
           aria-valuemin="0"
@@ -31,41 +35,47 @@ defineEmits<{ pause: [] }>()
           <i :style="{ width: `${state.rage}%` }" />
         </div>
         <div class="rage-label">
-          <span>怒气 {{ Math.floor(state.rage) }}%</span
-          ><b>{{ state.rage >= 100 ? 'Q 强制重连！' : '命中充能' }}</b>
+          <span>{{ t('怒气 {0}%', { '0': Math.floor(state.rage) }) }}</span
+          ><b>{{ t(state.rage >= 100 ? 'Q 强制重连！' : '命中充能') }}</b>
         </div>
       </div>
     </div>
     <div class="stage-hud">
       <span>{{ STAGES[state.stage]!.location }}</span
-      ><b>{{ blockAt(STAGES[state.stage]!.city, state.wave).name }}</b>
+      ><b>{{ t(blockAt(STAGES[state.stage]!.city, state.wave).name) }}</b>
       <div class="wave-pips">
         <i v-for="n in state.waveCount" :key="n" :class="{ done: n <= state.wave + 1 }" />
-        <span>街段 {{ state.wave + 1 }} / {{ state.waveCount }}</span>
+        <span>{{ t('街段 {0} / {1}', { '0': state.wave + 1, '1': state.waveCount }) }}</span>
       </div>
-      <div class="wave-progress" :aria-label="`本波击破 ${state.waveKills} / ${state.waveTotal}`">
+      <div
+        class="wave-progress"
+        :aria-label="t(`本波击破 ${state.waveKills} / ${state.waveTotal}`)"
+      >
         <i :style="{ width: `${(state.waveKills / Math.max(1, state.waveTotal)) * 100}%` }" />
       </div>
       <small class="wave-count">{{
-        state.advancing ? '已打通 · 向右前进 →' : `击破 ${state.waveKills} / ${state.waveTotal}`
+        t(state.advancing ? '已打通 · 向右前进 →' : `击破 ${state.waveKills} / ${state.waveTotal}`)
       }}</small>
     </div>
     <div class="score-hud">
       <span>RECOVERED DATA</span><strong>{{ state.score.toString().padStart(6, '0') }}</strong
-      ><span>场上 {{ state.enemies }} · 增援 {{ state.reserves }}</span>
-      <span
-        >旅程 {{ state.completed }}/{{ state.total }} · Buff
-        {{ state.build.reduce((sum, item) => sum + item.level, 0) }} 级</span
-      >
+      ><span>{{ t('场上 {0} · 增援 {1}', { '0': state.enemies, '1': state.reserves }) }}</span>
+      <span>{{
+        t('旅程 {0}/{1} · Buff {2} 级', {
+          '0': state.completed,
+          '1': state.total,
+          '2': state.build.reduce((sum, item) => sum + item.level, 0),
+        })
+      }}</span>
     </div>
-    <button class="icon-button pause-button" aria-label="暂停游戏" @click="$emit('pause')">
+    <button class="icon-button pause-button" :aria-label="t('暂停游戏')" @click="$emit('pause')">
       <GameIcon name="pause" />
     </button>
   </div>
   <div v-if="state.bossMaxHp" class="boss-hud">
     <div>
-      <b>路由猩猩 · 延迟之王</b
-      ><span>{{ state.shield ? '护盾在线 · 摧毁两侧中继器' : 'THE KING OF LAG' }}</span>
+      <b>{{ t('路由猩猩 · 延迟之王') }}</b
+      ><span>{{ t(state.shield ? '护盾在线 · 摧毁两侧中继器' : 'THE KING OF LAG') }}</span>
     </div>
     <div class="boss-track">
       <i :style="{ width: `${(state.bossHp / state.bossMaxHp) * 100}%` }" />
@@ -74,7 +84,7 @@ defineEmits<{ pause: [] }>()
   <div v-if="state.combo > 1" class="combo" :key="state.combo">
     <strong>{{ state.combo }}<span>HITS</span></strong
     ><span>{{
-      state.combo > 20 ? '带宽打满！' : state.combo > 10 ? '批量清理！' : '保持连接'
+      t(state.combo > 20 ? '带宽打满！' : state.combo > 10 ? '批量清理！' : '保持连接')
     }}</span>
     <span class="combo-damage">{{ state.comboDamage }} DAMAGE</span>
   </div>
@@ -92,18 +102,18 @@ defineEmits<{ pause: [] }>()
   <div class="weapon-hud">
     <GameIcon name="keyboard" :size="22" />
     <div>
-      <b>{{ state.weapon }}</b
+      <b>{{ t(state.weapon) }}</b
       ><span>{{
-        state.weaponUses ? `耐久 ${state.weaponUses} · E 投掷` : '靠近道具 · E 拾取'
+        t(state.weaponUses ? `耐久 ${state.weaponUses} · E 投掷` : '靠近道具 · E 拾取')
       }}</span>
     </div>
   </div>
   <div v-if="state.toastTime > 0" class="game-toast" role="status">
-    <GameIcon name="bolt" :size="16" />{{ state.toast }}
+    <GameIcon name="bolt" :size="16" />{{ t(state.toast) }}
   </div>
   <div class="dash-indicator" :class="{ ready: state.dashReady }">
     <span>SPACE</span
-    >{{ state.pursuitReady ? '追击！' : state.dashReady ? '冲刺就绪' : '冲刺冷却' }}
+    >{{ t(state.pursuitReady ? '追击！' : state.dashReady ? '冲刺就绪' : '冲刺冷却') }}
   </div>
 </template>
 

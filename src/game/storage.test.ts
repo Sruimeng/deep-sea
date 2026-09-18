@@ -71,6 +71,22 @@ describe('save data', () => {
     writeBest(100)
     expect(readBest()).toBe(2000)
   })
+  it('keeps high scores separate for each difficulty', () => {
+    writeBest(5000, 'casual')
+    writeBest(1000, 'hard')
+    writeBest(900, 'hard')
+    expect(readBest('casual')).toBe(5000)
+    expect(readBest('hard')).toBe(1000)
+    expect(readBest('nightmare')).toBe(0)
+  })
+  it('accepts old v2 saves but rejects unknown difficulty values', () => {
+    writeSave(run)
+    expect(readSave()).not.toBeNull()
+    entries.set('vast-offline-save-v1', JSON.stringify({ ...run, difficulty: 'impossible' }))
+    expect(readSave()).toBeNull()
+    writeSave({ ...run, difficulty: 'nightmare' })
+    expect(readSave()).toEqual({ ...run, difficulty: 'nightmare' })
+  })
   it('works when browser storage is unavailable', () => {
     vi.stubGlobal('localStorage', {
       getItem() {

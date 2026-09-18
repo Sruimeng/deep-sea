@@ -1,3 +1,4 @@
+import { translate, type Locale } from '../i18n'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { clone } from 'three/addons/utils/SkeletonUtils.js'
@@ -56,6 +57,8 @@ export class GameRenderer {
   private models = new Map<string, Model>()
   private materials = new Map<string, THREE.MeshStandardMaterial>()
   private size: ResizeObserver
+  locale: Locale = 'zh-CN'
+  private currentLocale: Locale = 'zh-CN'
   private currentStage = -1
   private clock = 0
   private disposed = false
@@ -231,6 +234,11 @@ export class GameRenderer {
     this.clearGroup(this.landmarks)
     this.echoes.clear()
     this.currentStage = stage
+    this.currentLocale = this.locale
+    this.renderer.domElement.setAttribute(
+      'aria-label',
+      translate('VAST 断网大作战 3D 游戏场景', this.locale),
+    )
     this.cameraX = undefined
     const info = STAGES[stage]!
     const lighting = [
@@ -246,7 +254,7 @@ export class GameRenderer {
     this.ambient.intensity = lighting.fill
 
     info.waves.forEach((_, segment) => {
-      const block = buildCityRoom(info, (color) => this.mat(color), segment)
+      const block = buildCityRoom(info, (color) => this.mat(color), segment, this.locale)
       block.position.x = streetCenter(segment)
       this.room.add(block)
     })
@@ -726,13 +734,14 @@ export class GameRenderer {
     const group = new THREE.Group()
     if (effect.kind === 'damage') {
       const feedback = HIT_FEEDBACK[effect.hitKind ?? 'light']
+      const label = translate(feedback.label, this.locale)
       const canvas = document.createElement('canvas')
       const ctx = canvas.getContext('2d')!
       const value = String(effect.damage ?? 0)
       ctx.font = 'italic 900 110px "Arial Black", sans-serif'
       const numberWidth = ctx.measureText(value).width
       ctx.font = '900 25px sans-serif'
-      canvas.width = Math.ceil(Math.max(numberWidth, ctx.measureText(feedback.label).width) + 48)
+      canvas.width = Math.ceil(Math.max(numberWidth, ctx.measureText(label).width) + 48)
       canvas.height = feedback.label ? 174 : 138
       ctx.textAlign = 'center'
       ctx.lineJoin = 'round'
@@ -754,9 +763,9 @@ export class GameRenderer {
       if (feedback.label) {
         ctx.font = '900 25px sans-serif'
         ctx.lineWidth = 7
-        ctx.strokeText(feedback.label, canvas.width / 2, 153)
+        ctx.strokeText(label, canvas.width / 2, 153)
         ctx.fillStyle = feedback.color
-        ctx.fillText(feedback.label, canvas.width / 2, 153)
+        ctx.fillText(label, canvas.width / 2, 153)
       }
       const texture = new THREE.CanvasTexture(canvas)
       texture.colorSpace = THREE.SRGBColorSpace
@@ -776,9 +785,9 @@ export class GameRenderer {
       ctx.font = 'bold 48px sans-serif'
       ctx.lineWidth = 9
       ctx.strokeStyle = '#1b2019'
-      ctx.strokeText(effect.text || '', 256, 50)
+      ctx.strokeText(translate(effect.text || '', this.locale), 256, 50, 490)
       ctx.fillStyle = effect.color
-      ctx.fillText(effect.text || '', 256, 50)
+      ctx.fillText(translate(effect.text || '', this.locale), 256, 50, 490)
       const texture = new THREE.CanvasTexture(canvas)
       texture.colorSpace = THREE.SRGBColorSpace
       const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthTest: false }))
@@ -863,7 +872,17 @@ export class GameRenderer {
   }
   render(game: Game, dt: number) {
     this.clock += dt
-    if (this.currentStage !== game.stage) {
+    if (this.currentLocale !== this.locale) {
+      for (const effect of game.effects) {
+        if (effect.kind !== 'text' && effect.kind !== 'damage') continue
+        const model = this.ephemeral.get(effect.id)
+        if (!model) continue
+        this.dynamic.remove(model)
+        this.disposeObject(model, false)
+        this.ephemeral.delete(effect.id)
+      }
+    }
+    if (this.currentStage !== game.stage || this.currentLocale !== this.locale) {
       this.buildRoom(game.stage)
       this.mergeRoom()
     }

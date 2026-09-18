@@ -2035,3 +2035,88 @@
     transform: rotate(4deg);
   }
 }
+
+.menu-stage .menu-view {
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+}
+.menu-stage .menu-copy {
+  padding-bottom: 32px;
+}
+.english .title-small {
+  font-size: clamp(44px, 6vw, 78px);
+  letter-spacing: -3px;
+}
+.english .title-large {
+  font-size: clamp(60px, 8vw, 104px);
+  letter-spacing: -4px;
+}
+.english .menu-tagline strong {
+  margin-left: 0.3em;
+}
+.english .upgrade-card h3 {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.english .touch-actions .KeyJ {
+  font-size: 15px;
+}
+.english .stage-hud > b {
+  max-width: 230px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.english .game-toast {
+  max-width: min(78%, 600px);
+  text-align: center;
+}
+@media (max-width: 700px) {
+  .english .title-small {
+    font-size: 47px;
+  }
+  .english .title-large {
+    font-size: 68px;
+  }
+  .english .english-title {
+    font-size: 16px;
+  }
+  .english .menu-description {
+    font-size: 10px;
+  }
+  .english .scene-caption {
+    max-width: 65%;
+  }
+  .english .touch-actions {
+    width: 195px;
+  }
+  .english .stage-hud > b {
+    max-width: 160px;
+  }
+  .english .boss-hud span {
+    font-size: 9px;
+  }
+  .english .bar-label b {
+    font-size: 9px;
+  }
+  .menu-stage .upload-sticker {
+    display: none;
+  }
+}
+@media (max-width: 700px) {
+  .menu-stage .scene-caption {
+    display: none;
+  }
+  .english .footer-stages {
+    display: none;
+  }
+}
+.modal-layer {
+  align-items: flex-start;
+}
+.modal-layer > section {
+  margin-block: auto;
+  flex-shrink: 0;
+  max-width: 100%;
+}

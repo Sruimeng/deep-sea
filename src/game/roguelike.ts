@@ -28,14 +28,14 @@ export function draftChoices(
   return pool.slice(0, 3)
 }
 
-export function upgradeBenefit(id: UpgradeId, level: number): string {
+export function upgradeBenefit(id: UpgradeId, level: number, healing = 1): string {
   switch (id) {
     case 'keyboard':
       return `拳脚伤害 +${35 * level}%`
     case 'dash':
       return `冲刺伤害 ${15 + 10 * level} · 冷却 ${Math.max(0.38, 0.78 - level * 0.08).toFixed(2)} 秒`
     case 'coffee':
-      return `生命上限 ${100 + 35 * level} · 咖啡回复 ${22 + 13 * level}`
+      return `生命上限 ${100 + 35 * level} · 咖啡回复 ${Math.round((22 + 13 * level) * healing * 10) / 10}`
     case 'cable':
       return `大招 ${80 + 30 * level} 伤害 / 12 米 · 命中怒气 +${8 + 3 * level}`
     case 'cache':
@@ -45,7 +45,7 @@ export function upgradeBenefit(id: UpgradeId, level: number): string {
     case 'quake':
       return `终结拳震波 ${10 * level} 伤害 / 3.6 米`
     case 'leech':
-      return `每次击破回复 ${2 * level} 生命`
+      return `每次击破回复 ${Math.round(2 * level * healing * 10) / 10} 生命`
     case 'aerial':
       return `飞踢、追击伤害 +${30 * level}%`
     case 'armor':

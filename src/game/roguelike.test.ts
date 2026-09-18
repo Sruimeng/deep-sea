@@ -11,7 +11,7 @@ const tick = (game: Game, seconds = 1) => {
 }
 function playing(upgrades: UpgradeId[] = []) {
   const game = new Game()
-  game.start()
+  game.start(undefined, 'casual')
   game.seed = 27
   game.upgrades = upgrades
   game.begin()
@@ -116,7 +116,7 @@ describe('campaign growth', () => {
     game.start({ version: 1, stage: 2, score: 100, upgrades: ['keyboard', 'coffee'] })
     expect(game.wave).toBe(0)
     expect(game.hero.maxHp).toBe(135)
-    game.start()
+    game.start(undefined, 'casual')
     expect(game.upgrades).toEqual([])
     expect(game.hero.maxHp).toBe(100)
     expect(completedBefore(2, 3)).toBe(15)
@@ -176,7 +176,7 @@ describe('buff combat effects', () => {
     game['damageHero'](1000, { x: 5, z: 0 })
     expect(game.mode).toBe('gameover')
 
-    game.start()
+    game.start(undefined, 'casual')
     game.begin()
     game.upgrades = ['combo', 'combo']
     const enemy = game.enemies[0]!

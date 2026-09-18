@@ -1,3 +1,4 @@
+import { DIFFICULTIES, type Difficulty } from './difficulty'
 import { completedBefore, draftChoices, levelOf, TOTAL_BLOCKS } from './roguelike'
 import { attackMove } from './attacks'
 import { STREET, streetBounds, streetCenter } from './street'
@@ -31,6 +32,10 @@ const clamp = (value: number, limit: number) => Math.max(-limit, Math.min(limit,
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.z - b.z)
 
 export class Game {
+  difficulty: Difficulty = 'standard'
+  get rules() {
+    return DIFFICULTIES[this.difficulty]
+  }
   mode: Mode = 'menu'
   stage = 0
   wave = 0
@@ -96,7 +101,12 @@ export class Game {
     this.setupProps()
   }
   private actor(kind: Actor['kind'], x: number, z: number): Actor {
-    const hp = kind === 'hero' ? 100 + this.level('coffee') * 35 : ENEMY_STATS[kind].hp
+    const hp =
+      kind === 'hero'
+        ? 100 + this.level('coffee') * 35
+        : ENEMY_STATS[kind].hp *
+          this.rules.health *
+          (1 + this.rules.growth * (this.stage + this.wave / STAGES[this.stage]!.waves.length))
     return {
       id: ++this.nextId,
       kind,
@@ -127,7 +137,12 @@ export class Game {
   level(id: UpgradeId) {
     return levelOf(this.upgrades, id)
   }
-  start(save?: SaveData) {
+  start(save?: SaveData, difficulty: Difficulty = 'standard') {
+    this.difficulty = save
+      ? save.version === 2
+        ? (save.difficulty ?? 'casual')
+        : 'casual'
+      : difficulty
     this.stage = save?.stage ?? 0
     this.wave = save?.version === 2 ? save.wave : 0
     this.score = save?.score ?? 0
@@ -143,6 +158,7 @@ export class Game {
   private save(phase: RunSave['phase'], wave = this.wave) {
     const checkpoint: RunSave = {
       version: 2,
+      difficulty: this.difficulty,
       stage: this.stage,
       wave,
       phase,
@@ -231,7 +247,7 @@ export class Game {
     this.hero.hp =
       id === 'coffee'
         ? this.hero.maxHp
-        : Math.min(this.hero.maxHp, this.hero.hp + this.hero.maxHp * 0.2)
+        : Math.min(this.hero.maxHp, this.hero.hp + this.hero.maxHp * this.rules.clearHeal)
     this.choices = []
     if (this.wave < STAGES[this.stage]!.waves.length - 1) {
       this.advancing = true
@@ -266,7 +282,10 @@ export class Game {
     this.reviveUsed = false
     this.directHits = 0
     this.waveDelay = 0
-    const kinds = STAGES[this.stage]!.waves[this.wave]!
+    const kinds = [...STAGES[this.stage]!.waves[this.wave]!]
+    const reinforcements: EnemyKind[] = ['charger', 'leaper', 'guard', 'bomber', 'medic']
+    for (let i = 0; i < this.rules.extraEnemies; i++)
+      kinds.push(reinforcements[(this.stage + this.wave + i) % reinforcements.length]!)
     this.reserves = [...kinds]
     this.waveTotal = kinds.length
     this.waveKills = this.spawnIndex = 0
@@ -286,7 +305,7 @@ export class Game {
     )
   }
   get crowdLimit() {
-    return Math.min(10, 6 + this.stage)
+    return Math.min(13, 6 + this.stage + this.rules.crowd)
   }
   private spawnReinforcements(count: number) {
     for (let n = 0; n < count && this.reserves.length; n++) {
@@ -298,11 +317,11 @@ export class Game {
       const x = Math.abs(edge - this.hero.x) < 3.5 ? center - side * 10.7 : edge
       const enemy = this.actor(kind, x, -3 + (i % 5) * 1.5)
       enemy.facing = Math.sign(this.hero.x - x)
-      enemy.cooldown = 0.8 + (i % 3) * 0.18
+      enemy.cooldown = (0.8 + (i % 3) * 0.18) * this.rules.cooldown
       this.enemies.push(enemy)
       this.effect('dash', enemy, '#a6cff5')
     }
-    this.reinforcementTime = 1.1
+    this.reinforcementTime = 1.1 * this.rules.cooldown
   }
   private announce(message: string) {
     this.toast = message
@@ -751,7 +770,10 @@ export class Game {
   }
 
   private kill(enemy: Actor) {
-    this.hero.hp = Math.min(this.hero.maxHp, this.hero.hp + this.level('leech') * 2)
+    this.hero.hp = Math.min(
+      this.hero.maxHp,
+      this.hero.hp + this.level('leech') * 2 * this.rules.healing,
+    )
     this.kills++
     this.waveKills++
     this.streak = this.streakTime > 0 ? this.streak + 1 : 1
@@ -785,7 +807,7 @@ export class Game {
     const kind = enemy.kind
     if (kind !== 'guard' && kind !== 'charger' && kind !== 'boss') return
     const boss = kind === 'boss'
-    const health = Math.min(this.hero.maxHp - this.hero.hp, boss ? 40 : 12)
+    const health = Math.min(this.hero.maxHp - this.hero.hp, (boss ? 40 : 12) * this.rules.healing)
     const rage = Math.min(100 - this.rage, boss ? 40 : 18)
     const score = boss ? 2000 : 300
     const label = boss
@@ -951,13 +973,13 @@ export class Game {
       const attackers = this.enemies.filter(
         (other) => other.hp > 0 && other.hurt === 0 && (other.windup > 0 || other.attack > 0),
       ).length
-      const hasOpening = attackers < 2
+      const hasOpening = attackers < this.rules.attackers
       if (inRange && enemy.cooldown === 0 && hasOpening) {
-        enemy.windup = stats.windup
+        enemy.windup = stats.windup * this.rules.windup
         enemy.target = { x: this.hero.x, z: this.hero.z }
         if (enemy.kind === 'boss') this.bossWarning(enemy)
         if (enemy.kind === 'leaper') {
-          const duration = stats.windup + 0.6
+          const duration = enemy.windup + 0.6
           this.zones.push({
             id: ++this.nextId,
             ...enemy.target,
@@ -977,7 +999,8 @@ export class Game {
       const tz = clamp(target.z, BOUNDS.z - 0.2) - enemy.z
       const travel = Math.hypot(tx, tz)
       if (travel > 0.15) {
-        const speed = stats.speed * (enemy.kind === 'spinner' && d < 4 ? 1.45 : 1)
+        const speed =
+          stats.speed * this.rules.speed * (enemy.kind === 'spinner' && d < 4 ? 1.45 : 1)
         const step = Math.min(travel, speed * dt)
         enemy.x = this.clampX(enemy.x + (tx / travel) * step)
         enemy.z = clamp(enemy.z + (tz / travel) * step, BOUNDS.z)
@@ -1031,7 +1054,7 @@ export class Game {
   private enemyAttack(enemy: Actor) {
     if (enemy.kind === 'hero') return
     const stats = ENEMY_STATS[enemy.kind]
-    enemy.cooldown = stats.cooldown
+    enemy.cooldown = stats.cooldown * this.rules.cooldown
     enemy.attack = 0.3
     if (enemy.kind === 'boss') return
     if (enemy.kind === 'medic') {
@@ -1096,7 +1119,7 @@ export class Game {
   private damageHero(damage: number, from: Point) {
     if (this.mode !== 'playing' || this.hero.hurt > 0 || this.dashTime > 0) return
     const h = this.hero
-    h.hp = Math.max(0, h.hp - damage * (1 - this.level('armor') * 0.08))
+    h.hp = Math.max(0, h.hp - damage * this.rules.damage * (1 - this.level('armor') * 0.08))
     h.hurt = 0.85
     h.vx = (Math.sign(h.x - from.x) || 1) * 4
     this.combo = this.comboDamage = 0
@@ -1195,7 +1218,10 @@ export class Game {
   private collectDrop(drop: Drop) {
     drop.life = 0
     if (drop.kind === 'coffee') {
-      this.hero.hp = Math.min(this.hero.maxHp, this.hero.hp + (22 + this.level('coffee') * 13))
+      this.hero.hp = Math.min(
+        this.hero.maxHp,
+        this.hero.hp + (22 + this.level('coffee') * 13) * this.rules.healing,
+      )
       this.effect('heal', this.hero)
       this.effect('text', this.hero, '#f9cf00', '续命咖啡')
     } else this.score += 50
@@ -1205,6 +1231,8 @@ export class Game {
   snapshot(): Snapshot {
     const boss = this.enemies.find((enemy) => enemy.kind === 'boss' && enemy.hp > 0)
     return {
+      difficulty: this.difficulty,
+      clearHeal: this.rules.clearHeal,
       advancing: this.advancing,
       pursuitReady: this.dashCooldown === 0 && !!this.findPursuitTarget(),
       rewards: this.rewards

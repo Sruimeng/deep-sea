@@ -1,3 +1,4 @@
+import { translate, type Locale } from '../i18n'
 import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
 import { blockAt } from './blocks'
@@ -25,7 +26,10 @@ const THEMES: Record<
 
 class CitySet {
   readonly group = new THREE.Group()
-  constructor(private material: MaterialFactory) {}
+  constructor(
+    private material: MaterialFactory,
+    private locale: Locale,
+  ) {}
   box(size: Position, at: Position, color: string, radius = 0) {
     const geometry = radius
       ? new RoundedBoxGeometry(...size, 2, radius)
@@ -74,7 +78,12 @@ class CitySet {
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillStyle = foreground
-    ctx.fillText(text, canvas.width / 2, canvas.height / 2)
+    ctx.fillText(
+      translate(text.replace(/\s+/g, ' ').trim(), this.locale),
+      canvas.width / 2,
+      canvas.height / 2,
+      canvas.width * 0.95,
+    )
     const map = new THREE.CanvasTexture(canvas)
     map.colorSpace = THREE.SRGBColorSpace
     const mesh = new THREE.Mesh(
@@ -157,8 +166,13 @@ class CitySet {
   }
 }
 
-export function buildCityRoom(stage: Stage, material: MaterialFactory, segment = 0) {
-  const s = new CitySet(material),
+export function buildCityRoom(
+  stage: Stage,
+  material: MaterialFactory,
+  segment = 0,
+  locale: Locale = 'zh-CN',
+) {
+  const s = new CitySet(material, locale),
     theme = THEMES[stage.city],
     block = blockAt(stage.city, segment)
   s.box([27, 0.5, 12], [0, -0.3, 0], theme.edge, 0.12)

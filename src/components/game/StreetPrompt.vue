@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useLocale } from '../../i18n/useLocale'
+
+const { t } = useLocale()
 defineProps<{ advancing: boolean; pursuitReady: boolean }>()
 </script>
 
@@ -9,8 +12,8 @@ defineProps<{ advancing: boolean; pursuitReady: boolean }>()
     :class="{ forward: advancing }"
     role="status"
   >
-    <strong>{{ advancing ? 'GO →' : '追击！' }}</strong>
-    <span>{{ advancing ? '街段打通 · 继续向右' : '空格 / 闪 · 追上去再补一击' }}</span>
+    <strong>{{ t(advancing ? 'GO →' : '追击！') }}</strong>
+    <span>{{ t(advancing ? '街段打通 · 继续向右' : '空格 / 闪 · 追上去再补一击') }}</span>
   </div>
 </template>
 

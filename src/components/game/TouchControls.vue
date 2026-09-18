@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useLocale } from '../../i18n/useLocale'
+
+const { t } = useLocale()
 const emit = defineEmits<{ input: [key: string, down: boolean] }>()
 const moves = [
   { key: 'KeyW', text: '↑' },
@@ -25,7 +28,7 @@ function press(event: PointerEvent, key: string) {
         v-for="move in moves"
         :key="move.key"
         :class="move.key"
-        :aria-label="`移动 ${move.text}`"
+        :aria-label="t(`移动 ${move.text}`)"
         @pointerdown="press($event, move.key)"
         @pointerup="$emit('input', move.key, false)"
         @pointercancel="$emit('input', move.key, false)"
@@ -44,7 +47,7 @@ function press(event: PointerEvent, key: string) {
         @pointercancel="$emit('input', action.key, false)"
         @lostpointercapture="$emit('input', action.key, false)"
       >
-        {{ action.text }}
+        {{ t(action.text) }}
       </button>
     </div>
   </div>

@@ -1,13 +1,16 @@
 <script setup lang="ts">
+import { useLocale } from '../../i18n/useLocale'
 import type { Milestone } from '../../game/types'
+
+const { t } = useLocale()
 defineProps<{ milestone: Milestone }>()
 </script>
 
 <template>
   <div class="battle-milestone" :key="`${milestone.title}-${milestone.count}`" role="status">
     <span class="milestone-count">{{ milestone.count }}<small> K.O.</small></span>
-    <strong class="milestone-title">{{ milestone.title }}</strong>
-    <span class="milestone-bonus">额外奖励 +{{ milestone.bonus }}</span>
+    <strong class="milestone-title">{{ t(milestone.title) }}</strong>
+    <span class="milestone-bonus">{{ t('额外奖励 +{0}', { '0': milestone.bonus }) }}</span>
   </div>
 </template>
 

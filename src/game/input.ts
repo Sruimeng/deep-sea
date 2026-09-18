@@ -23,16 +23,27 @@ export class Input {
   private touches = new Set<string>()
   private pressed = new Set<Action>()
   enabled = false
+  draftEnabled = false
+  onChoose?: (index: number) => void
   onPause?: () => void
   onConfirm?: () => void
   onBlur?: () => void
   private keydown = (event: KeyboardEvent) => {
-    if ((event.target as HTMLElement)?.matches('input, textarea, select')) return
+    if ((event.target as HTMLElement)?.closest('input, textarea, select, [contenteditable="true"]'))
+      return
+    if (event.altKey || event.ctrlKey || event.metaKey || event.isComposing) return
+    const choice = /^(?:Digit|Numpad)([123])$/.exec(event.code)
+    if (this.draftEnabled && choice) {
+      event.preventDefault()
+      if (!event.repeat) this.onChoose?.(Number(choice[1]) - 1)
+      return
+    }
     if (event.code === 'Escape' && !event.repeat) {
       this.onPause?.()
       return
     }
     if (event.code === 'Enter' && !event.repeat) {
+      if ((event.target as HTMLElement)?.closest('button, summary, a')) return
       this.onConfirm?.()
       return
     }

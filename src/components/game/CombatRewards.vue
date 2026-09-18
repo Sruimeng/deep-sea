@@ -1,16 +1,24 @@
 <script setup lang="ts">
+import { useLocale } from '../../i18n/useLocale'
 import type { CombatReward } from '../../game/types'
+
+const { t } = useLocale()
 defineProps<{ rewards: CombatReward[] }>()
 </script>
 
 <template>
   <div class="combat-rewards" role="status" aria-live="polite" aria-atomic="true">
     <div v-for="reward in rewards" :key="reward.id" class="combat-reward">
-      <span class="reward-label">{{ reward.label }}</span>
-      <strong class="reward-score">+{{ reward.score }} <small>数据</small></strong>
-      <span class="reward-supplies">
-        已到账<span v-if="reward.health"> · 生命 +{{ Math.round(reward.health) }}</span>
-        <span v-if="reward.rage"> · 怒气 +{{ Math.round(reward.rage) }}</span>
+      <span class="reward-label">{{ t(reward.label) }}</span>
+      <strong class="reward-score"
+        >+{{ reward.score }} <small>{{ t('数据') }}</small></strong
+      >
+      <span class="reward-supplies"
+        >{{ t('已到账')
+        }}<span v-if="reward.health">{{
+          t('· 生命 +{0}', { '0': Math.round(reward.health) })
+        }}</span>
+        <span v-if="reward.rage">{{ t('· 怒气 +{0}', { '0': Math.round(reward.rage) }) }}</span>
       </span>
     </div>
   </div>

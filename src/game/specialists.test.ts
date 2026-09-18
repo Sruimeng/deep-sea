@@ -8,7 +8,7 @@ import type { Controls, EnemyKind } from './types'
 const idle: Controls = { x: 0, z: 0, attack: false, pressed: new Set() }
 function setup(kind: EnemyKind, wave = 0) {
   const game = new Game()
-  game.start()
+  game.start(undefined, 'casual')
   game.begin()
   game.wave = wave
   game.hero.x = streetCenter(wave)

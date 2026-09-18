@@ -1,3 +1,4 @@
+import type { Difficulty } from './difficulty'
 export type Mode = 'menu' | 'intro' | 'playing' | 'paused' | 'upgrade' | 'gameover' | 'victory'
 export type EnemyKind =
   'packet' | 'spinner' | 'guard' | 'charger' | 'leaper' | 'bomber' | 'medic' | 'boss'
@@ -135,6 +136,7 @@ export interface LegacySave {
   upgrades: UpgradeId[]
 }
 export interface RunSave {
+  difficulty?: Difficulty
   version: 2
   stage: number
   wave: number
@@ -170,6 +172,8 @@ export interface Milestone {
   life: number
 }
 export interface Snapshot {
+  difficulty: Difficulty
+  clearHeal: number
   advancing: boolean
   pursuitReady: boolean
   reserves: number

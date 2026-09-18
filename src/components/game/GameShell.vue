@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, shallowRef, useTemplateRef } from 'vue'
+import { useLocale } from '../../i18n/useLocale'
+import { DIFFICULTIES, type Difficulty } from '../../game/difficulty'
+import LanguageSelect from './LanguageSelect.vue'
+import { watch, nextTick, onMounted, onUnmounted, shallowRef, useTemplateRef } from 'vue'
 import { STAGES } from '../../game/content'
 import { Game } from '../../game/simulation'
 import { GameRenderer } from '../../game/renderer'
@@ -14,12 +17,18 @@ import GameHud from './GameHud.vue'
 import GameOverlays from './GameOverlays.vue'
 import TouchControls from './TouchControls.vue'
 
+const { t, locale } = useLocale()
+
 const game = new Game()
 game.hero.x = 4
 game.hero.z = 1
 const state = shallowRef(game.snapshot())
 const saved = shallowRef(readSave())
-const best = shallowRef(readBest())
+const difficulty = shallowRef<Difficulty>('standard')
+const best = shallowRef(readBest(difficulty.value))
+watch(difficulty, (value) => {
+  best.value = readBest(value)
+})
 const previewStage = shallowRef(0)
 const ready = shallowRef(false)
 const progress = shallowRef(0)
@@ -41,15 +50,20 @@ let modeBeforeHelp = game.mode
 let restoreFocus: HTMLElement | null = null
 const audio = new Audio()
 
+watch(locale, (value) => {
+  if (renderer) renderer.locale = value
+})
+
 function sync() {
   state.value = game.snapshot()
+  if (input) input.draftEnabled = game.mode === 'upgrade' && !help.value
   if (input) input.enabled = game.mode === 'playing' && !help.value
 }
 function start(continuing = false) {
   if (!ready.value) return
   void audio.unlock()
   input?.clear()
-  game.start(continuing && saved.value ? saved.value : undefined)
+  game.start(continuing && saved.value ? saved.value : undefined, difficulty.value)
   sync()
 }
 function previewCity(stage: number) {
@@ -91,7 +105,7 @@ function menu() {
   game.hero.y = 0
   game.hero.hp = game.hero.maxHp
   saved.value = readSave()
-  best.value = readBest()
+  best.value = readBest(difficulty.value)
   input?.clear()
   sync()
 }
@@ -189,10 +203,10 @@ onMounted(async () => {
     saved.value = save
   }
   game.onFinish = (score) => {
-    writeBest(score)
+    writeBest(score, game.difficulty)
     clearSave()
     saved.value = null
-    best.value = readBest()
+    best.value = readBest(difficulty.value)
   }
   try {
     muted.value = localStorage.getItem('vast-muted') === 'true'
@@ -211,6 +225,10 @@ onMounted(async () => {
     } else pause()
   }
   input.onBlur = pause
+  input.onChoose = (index) => {
+    const choice = game.choices[index]
+    if (!help.value && game.mode === 'upgrade' && choice) choose(choice.id)
+  }
   input.onConfirm = () => {
     if (help.value) closeHelp()
     else if (game.mode === 'intro') begin()
@@ -221,6 +239,7 @@ onMounted(async () => {
   document.addEventListener('keydown', focusTrap)
   try {
     renderer = new GameRenderer(scene.value!)
+    renderer.locale = locale.value
     renderer.lowMotion = lowMotion.value
     renderer.onProgress = (value, text) => {
       progress.value = value
@@ -249,13 +268,17 @@ onUnmounted(() => {
 <template>
   <main
     class="game-shell"
-    :class="{ 'in-game': state.mode !== 'menu', 'reduced-motion': lowMotion }"
+    :class="{
+      english: locale === 'en',
+      'in-game': state.mode !== 'menu',
+      'reduced-motion': lowMotion,
+    }"
   >
     <header class="site-header">
       <a
         class="brand"
         href="#"
-        aria-label="VAST 游戏首页"
+        :aria-label="t('VAST 游戏首页')"
         @click.prevent="state.mode === 'menu' ? undefined : pause()"
         ><img class="brand-mark" src="/brand/tripo-mark.svg" alt="" /><img
           class="brand-wordmark"
@@ -268,17 +291,18 @@ onUnmounted(() => {
         <span class="header-ping">999<span>ms</span></span>
       </div>
       <div class="header-tools">
+        <LanguageSelect />
         <button
           class="icon-button"
-          :aria-label="muted ? '开启声音' : '关闭声音'"
+          :aria-label="t(muted ? '开启声音' : '关闭声音')"
           :aria-pressed="!muted"
           @click="toggleSound"
         >
           <GameIcon :name="muted ? 'muted' : 'sound'" /></button
-        ><button class="icon-button" aria-label="操作指南" @click="openHelp">
+        ><button class="icon-button" :aria-label="t('操作指南')" @click="openHelp">
           <GameIcon name="help" /></button
         ><button class="fullscreen-button" @click="toggleFullscreen">
-          {{ fullscreen ? '退出全屏' : '全屏游玩' }} <span>↗</span>
+          {{ t(fullscreen ? '退出全屏' : '全屏游玩') }} <span>↗</span>
         </button>
       </div>
     </header>
@@ -288,6 +312,11 @@ onUnmounted(() => {
       <GameMenu
         v-if="state.mode === 'menu'"
         :saved="!!saved"
+        :difficulty="difficulty"
+        :saved-difficulty="
+          saved ? (saved.version === 2 ? (saved.difficulty ?? 'casual') : 'casual') : undefined
+        "
+        @difficulty="difficulty = $event"
         :best="best"
         :ready="ready"
         :progress="progress"
@@ -317,32 +346,43 @@ onUnmounted(() => {
         @input="(key, down) => input?.touch(key, down)"
       />
       <div v-if="error" class="error-state" role="alert">
-        <h2>连接 3D 世界失败</h2>
-        <p>{{ error }}</p>
-        <button class="button button-primary" @click="reload">重新加载</button>
+        <h2>{{ t('连接 3D 世界失败') }}</h2>
+        <p>{{ t(error) }}</p>
+        <button class="button button-primary" @click="reload">{{ t('重新加载') }}</button>
       </div>
     </section>
     <footer class="site-footer">
       <span class="footer-title">{{
-        state.mode === 'menu'
-          ? 'BUILT FOR BAD WIFI. GOOD TIMES.'
-          : `OFFICE 0${state.stage + 1} / 05`
+        t(
+          String(
+            state.mode === 'menu'
+              ? 'BUILT FOR BAD WIFI. GOOD TIMES.'
+              : `OFFICE 0${state.stage + 1} / 05 · ${t(DIFFICULTIES[state.difficulty].name)}`,
+          ),
+        )
       }}</span>
       <div v-if="state.mode === 'menu'" class="footer-stages">
         <span v-for="(stage, i) in STAGES" :key="stage.city"
-          >0{{ i + 1 }} {{ stage.cityName }}</span
+          >0{{ i + 1 }} {{ t(stage.cityName) }}</span
         >
       </div>
       <div v-else class="footer-controls">
-        <span><kbd>WASD</kbd>移动</span><span><kbd>J</kbd>出拳</span><span><kbd>K</kbd>跳跃</span
-        ><span><kbd>E</kbd>拾 / 扔</span><span><kbd>Q</kbd>重连</span>
+        <span><kbd>WASD</kbd>{{ t('移动') }}</span
+        ><span><kbd>J</kbd>{{ t('出拳') }}</span
+        ><span><kbd>K</kbd>{{ t('跳跃') }}</span
+        ><span><kbd>E</kbd>{{ t('拾 / 扔') }}</span
+        ><span><kbd>Q</kbd>{{ t('重连') }}</span>
       </div>
       <span class="footer-build">{{
-        state.mode === 'menu'
-          ? ready
-            ? offlineMessage
-            : assetMessage
-          : 'ESC 暂停 / 自动存档已开启'
+        t(
+          String(
+            state.mode === 'menu'
+              ? ready
+                ? offlineMessage
+                : assetMessage
+              : 'ESC 暂停 / 自动存档已开启',
+          ),
+        )
       }}</span>
     </footer>
   </main>

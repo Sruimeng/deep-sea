@@ -1,20 +1,31 @@
 <script setup lang="ts">
+import { useLocale } from '../../i18n/useLocale'
+import { DIFFICULTIES, type Difficulty } from '../../game/difficulty'
 import type { BuildItem } from '../../game/types'
 import { upgradeBenefit } from '../../game/roguelike'
-defineProps<{ build: BuildItem[] }>()
+
+const { t } = useLocale()
+defineProps<{ build: BuildItem[]; difficulty: Difficulty }>()
 </script>
 <template>
   <details v-if="build.length" class="run-build">
     <summary>
-      本局构筑 · {{ build.reduce((total, item) => total + item.level, 0) }} 次成长 ·
-      {{ build.length }} 种 Buff
+      {{
+        t('本局构筑 · {0} 次成长 · {1} 种 Buff', {
+          '0': build.reduce((total, item) => total + item.level, 0),
+          '1': build.length,
+        })
+      }}
     </summary>
     <div class="build-list">
       <div v-for="item in build" :key="item.id" class="build-item">
         <b
-          >{{ item.icon }} {{ item.name }} <span>Lv.{{ item.level }} / {{ item.maxLevel }}</span></b
+          >{{ item.icon }} {{ t(item.name) }}
+          <span>Lv.{{ item.level }} / {{ item.maxLevel }}</span></b
         >
-        <small>{{ upgradeBenefit(item.id, item.level) }}</small>
+        <small>{{
+          t(upgradeBenefit(item.id, item.level, DIFFICULTIES[difficulty].healing))
+        }}</small>
       </div>
     </div>
   </details>
